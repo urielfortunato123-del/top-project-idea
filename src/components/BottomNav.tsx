@@ -1,16 +1,19 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, Camera, Images, User } from 'lucide-react';
+import { Home, Camera, Images, User, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const navItems = [
-  { to: '/dashboard', icon: Home, label: 'Início' },
-  { to: '/capture', icon: Camera, label: 'Capturar' },
-  { to: '/photos', icon: Images, label: 'Fotos' },
-  { to: '/profile', icon: User, label: 'Perfil' },
-];
+import { useAuth } from '@/hooks/useAuth';
 
 export function BottomNav() {
   const location = useLocation();
+  const { isAdmin } = useAuth();
+
+  const navItems = [
+    { to: '/dashboard', icon: Home, label: 'Início' },
+    { to: '/capture', icon: Camera, label: 'Capturar' },
+    { to: '/photos', icon: Images, label: 'Fotos' },
+    ...(isAdmin ? [{ to: '/admin', icon: Settings, label: 'Admin' }] : []),
+    { to: '/profile', icon: User, label: 'Perfil' },
+  ];
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border pwa-safe-area">
@@ -24,7 +27,7 @@ export function BottomNav() {
               key={item.to}
               to={item.to}
               className={cn(
-                'flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-lg transition-all duration-200',
+                'flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-all duration-200',
                 isActive
                   ? 'text-primary'
                   : 'text-muted-foreground hover:text-foreground'

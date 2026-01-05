@@ -1,36 +1,76 @@
-import { useAuth } from '@/contexts/AuthContext';
-import { useOfflineQueue } from '@/hooks/useOfflineQueue';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
+import { usePendingPhotos, usePhotoRecords, useSyncPendingPhotos } from '@/hooks/usePhotos';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { BottomNav } from '@/components/BottomNav';
 import { SyncIndicator } from '@/components/SyncIndicator';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Camera, Images, Clock, CheckCircle, AlertCircle, TrendingUp } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Camera, Images, Clock, CheckCircle, AlertCircle, CloudUpload, RefreshCw } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Dashboard() {
-  const { user } = useAuth();
-  const { isOnline, isSyncing, syncQueue, getSyncStatus } = useOfflineQueue();
-  const syncStatus = getSyncStatus();
+  const { user, profile, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const isOnline = useOnlineStatus();
+  const { toast } = useToast();
+  
+  const { data: pendingPhotos = [] } = usePendingPhotos();
+  const { data: photoRecords = [] } = usePhotoRecords();
+  const syncMutation = useSyncPendingPhotos();
+
+  const pendingCount = pendingPhotos.filter(p => p.status === 'pending' || p.status === 'error').length;
+  const uploadedCount = photoRecords.length;
+  const errorCount = pendingPhotos.filter(p => p.status === 'error').length;
+
+  const handleSync = async () => {
+    if (!user) return;
+    
+    try {
+      const results = await syncMutation.mutateAsync(user.id);
+      const successCount = results.filter(r => r.success).length;
+      const failCount = results.filter(r => !r.success).length;
+
+      if (successCount > 0) {
+        toast({
+          title: 'Sincronização concluída',
+          description: `${successCount} foto(s) enviada(s) com sucesso.`,
+        });
+      }
+      if (failCount > 0) {
+        toast({
+          title: 'Algumas fotos falharam',
+          description: `${failCount} foto(s) não puderam ser enviadas.`,
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Erro na sincronização',
+        description: 'Não foi possível sincronizar as fotos.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   const stats = [
     {
       label: 'Pendentes',
-      value: syncStatus.pending,
+      value: pendingCount,
       icon: Clock,
       color: 'text-warning',
       bgColor: 'bg-warning/10',
     },
     {
       label: 'Enviadas',
-      value: syncStatus.synced,
+      value: uploadedCount,
       icon: CheckCircle,
       color: 'text-success',
       bgColor: 'bg-success/10',
     },
     {
       label: 'Erros',
-      value: syncStatus.error,
+      value: errorCount,
       icon: AlertCircle,
       color: 'text-destructive',
       bgColor: 'bg-destructive/10',
@@ -40,18 +80,21 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background pb-24">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-card/80 backdrop-blur-md border-b border-border pwa-safe-area">
+      <header className="sticky top-0 z-40 bg-card/80 backdrop-blur-md border-b border-border">
         <div className="px-4 py-4">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-2">
             <div>
               <p className="text-sm text-muted-foreground">Olá,</p>
-              <h1 className="text-xl font-bold">{user?.name}</h1>
+              <h1 className="text-xl font-bold">{profile?.full_name || user?.email}</h1>
+              {isAdmin && (
+                <span className="text-xs text-primary font-medium">Administrador</span>
+              )}
             </div>
             <SyncIndicator
               isOnline={isOnline}
-              isSyncing={isSyncing}
-              syncStatus={syncStatus}
-              onSync={syncQueue}
+              isSyncing={syncMutation.isPending}
+              pendingCount={pendingCount}
+              onSync={handleSync}
             />
           </div>
         </div>
@@ -76,10 +119,32 @@ export default function Dashboard() {
               size="lg"
               variant="secondary"
               className="h-auto py-6 flex-col gap-2"
+              onClick={() => navigate('/pending')}
+            >
+              <CloudUpload className="h-8 w-8" />
+              <span className="font-semibold">Pendentes ({pendingCount})</span>
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Button
+              size="lg"
+              variant="outline"
+              className="h-auto py-4 flex-col gap-2"
+              onClick={handleSync}
+              disabled={!isOnline || pendingCount === 0 || syncMutation.isPending}
+            >
+              <RefreshCw className={`h-6 w-6 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+              <span className="text-sm">Sincronizar</span>
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="h-auto py-4 flex-col gap-2"
               onClick={() => navigate('/photos')}
             >
-              <Images className="h-8 w-8" />
-              <span className="font-semibold">Minhas Fotos</span>
+              <Images className="h-6 w-6" />
+              <span className="text-sm">Minhas Fotos</span>
             </Button>
           </div>
         </section>
@@ -87,7 +152,7 @@ export default function Dashboard() {
         {/* Stats */}
         <section className="space-y-3">
           <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-            Hoje
+            Resumo
           </h2>
           <div className="grid grid-cols-3 gap-3">
             {stats.map((stat) => {
@@ -123,32 +188,6 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         )}
-
-        {/* Recent Activity */}
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-              Atividade Recente
-            </h2>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/photos')}>
-              Ver todas
-            </Button>
-          </div>
-          <Card className="bg-card">
-            <CardContent className="p-6 flex flex-col items-center justify-center text-center">
-              <div className="p-3 rounded-full bg-muted mb-3">
-                <TrendingUp className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Capture sua primeira foto do dia para ver a atividade aqui.
-              </p>
-              <Button className="mt-4" onClick={() => navigate('/capture')}>
-                <Camera className="mr-2 h-4 w-4" />
-                Capturar Agora
-              </Button>
-            </CardContent>
-          </Card>
-        </section>
       </main>
 
       <BottomNav />

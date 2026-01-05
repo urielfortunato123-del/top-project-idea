@@ -1,0 +1,211 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
+import { 
+  addPendingPhoto, 
+  getPendingPhotos, 
+  updatePendingPhotoStatus, 
+  deletePendingPhoto,
+  PendingPhoto 
+} from '@/lib/indexedDB';
+
+export interface PhotoRecord {
+  id: string;
+  company_id: string;
+  project_id: string;
+  user_id: string;
+  template_id: string | null;
+  activity_text: string | null;
+  device_timestamp: string;
+  server_timestamp: string;
+  latitude: number | null;
+  longitude: number | null;
+  accuracy: number | null;
+  file_url: string;
+  file_path: string;
+  status: string;
+  show_stamp: boolean;
+  created_at: string;
+  companies?: { name: string };
+  projects?: { name: string };
+  templates?: { name: string; icon: string } | null;
+}
+
+export function usePhotoRecords() {
+  return useQuery({
+    queryKey: ['photo_records'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('photo_records')
+        .select(`
+          *,
+          companies(name),
+          projects(name),
+          templates(name, icon)
+        `)
+        .order('device_timestamp', { ascending: false });
+      
+      if (error) throw error;
+      return data as PhotoRecord[];
+    },
+  });
+}
+
+export function usePendingPhotos() {
+  return useQuery({
+    queryKey: ['pending_photos'],
+    queryFn: getPendingPhotos,
+    refetchInterval: 5000, // Refetch every 5 seconds
+  });
+}
+
+interface UploadPhotoParams {
+  companyId: string;
+  companySlug: string;
+  projectId: string;
+  templateId: string | null;
+  activityText: string | null;
+  deviceTimestamp: Date;
+  latitude: number | null;
+  longitude: number | null;
+  accuracy: number | null;
+  imageBlob: Blob;
+  showStamp: boolean;
+  userName: string;
+  userId: string;
+}
+
+export function useUploadPhoto() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: UploadPhotoParams) => {
+      const timestamp = format(params.deviceTimestamp, 'yyyyMMdd_HHmmss');
+      const dateFolder = format(params.deviceTimestamp, 'yyyy-MM-dd');
+      const monthFolder = format(params.deviceTimestamp, 'yyyy-MM');
+      const userSlug = params.userName.replace(/\s+/g, '_');
+      
+      const filePath = `${params.companySlug}/${userSlug}/${monthFolder}/${dateFolder}/${params.templateId || 'geral'}/IMG_${timestamp}.jpg`;
+      
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from('photos')
+        .upload(filePath, params.imageBlob, {
+          contentType: 'image/jpeg',
+          upsert: false,
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('photos')
+        .getPublicUrl(filePath);
+
+      // Insert record
+      const { data, error } = await supabase
+        .from('photo_records')
+        .insert({
+          company_id: params.companyId,
+          project_id: params.projectId,
+          user_id: params.userId,
+          template_id: params.templateId,
+          activity_text: params.activityText || null,
+          device_timestamp: params.deviceTimestamp.toISOString(),
+          latitude: params.latitude,
+          longitude: params.longitude,
+          accuracy: params.accuracy,
+          file_url: urlData.publicUrl,
+          file_path: filePath,
+          show_stamp: params.showStamp,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['photo_records'] });
+    },
+  });
+}
+
+export function useSyncPendingPhotos() {
+  const queryClient = useQueryClient();
+  const uploadPhoto = useUploadPhoto();
+
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      const pending = await getPendingPhotos();
+      const toSync = pending.filter(p => p.status === 'pending' || p.status === 'error');
+      
+      const results: { id: string; success: boolean; error?: string }[] = [];
+
+      for (const photo of toSync) {
+        try {
+          await updatePendingPhotoStatus(photo.id, 'uploading');
+          
+          // Get company slug
+          const { data: company } = await supabase
+            .from('companies')
+            .select('slug')
+            .eq('id', photo.companyId)
+            .single();
+
+          if (!company) throw new Error('Empresa não encontrada');
+
+          // Get user name
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', userId)
+            .single();
+
+          await uploadPhoto.mutateAsync({
+            companyId: photo.companyId,
+            companySlug: company.slug,
+            projectId: photo.projectId,
+            templateId: photo.templateId,
+            activityText: photo.activityText,
+            deviceTimestamp: new Date(photo.deviceTimestamp),
+            latitude: photo.latitude,
+            longitude: photo.longitude,
+            accuracy: photo.accuracy,
+            imageBlob: photo.imageBlob,
+            showStamp: photo.showStamp,
+            userName: profile?.full_name || 'unknown',
+            userId,
+          });
+
+          await deletePendingPhoto(photo.id);
+          results.push({ id: photo.id, success: true });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Erro desconhecido';
+          await updatePendingPhotoStatus(photo.id, 'error', message);
+          results.push({ id: photo.id, success: false, error: message });
+        }
+      }
+
+      return results;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pending_photos'] });
+      queryClient.invalidateQueries({ queryKey: ['photo_records'] });
+    },
+  });
+}
+
+export function useSavePendingPhoto() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (photo: PendingPhoto) => {
+      await addPendingPhoto(photo);
+      return photo;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pending_photos'] });
+    },
+  });
+}
