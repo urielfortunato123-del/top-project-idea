@@ -61,12 +61,6 @@ const TEMPLATE_PATTERNS: Record<string, { entities: string[]; keywords: Record<s
 
 // OCR Post-processing utilities
 function normalizeDate(text: string): string {
-  // Common date patterns in PT-BR
-  const patterns = [
-    /(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/g,
-    /(\d{1,2})\s*de\s*(\w+)\s*de\s*(\d{2,4})/gi
-  ];
-  
   const months: Record<string, string> = {
     janeiro: "01", fevereiro: "02", março: "03", marco: "03", abril: "04",
     maio: "05", junho: "06", julho: "07", agosto: "08", setembro: "09",
@@ -74,55 +68,37 @@ function normalizeDate(text: string): string {
   };
   
   let normalized = text;
-  
-  // Replace month names with numbers
   for (const [name, num] of Object.entries(months)) {
     normalized = normalized.replace(new RegExp(name, "gi"), num);
   }
-  
   return normalized;
 }
 
 function normalizeKm(text: string): string {
-  // Normalize KM patterns: km 123+450, KM123,450, etc.
   return text.replace(/km\s*(\d+)[\+\,\.]?(\d{0,3})/gi, (_, km, m) => {
-    return `KM ${km}+${m.padStart(3, "0")}`;
+    return `KM ${km}+${(m || "000").padStart(3, "0")}`;
   });
 }
 
 function normalizePlate(text: string): string {
-  // Brazilian plate patterns: ABC-1234, ABC1D23
   return text.replace(/([A-Z]{3})\s*[-]?\s*(\d{1}[A-Z\d]{1}\d{2})/gi, (_, letters, numbers) => {
     return `${letters.toUpperCase()}-${numbers.toUpperCase()}`;
   });
 }
 
 function normalizeCNPJ(text: string): string {
-  // CNPJ: XX.XXX.XXX/XXXX-XX
   return text.replace(/(\d{2})[\.\s]?(\d{3})[\.\s]?(\d{3})[\/\s]?(\d{4})[-\s]?(\d{2})/g, 
     (_, a, b, c, d, e) => `${a}.${b}.${c}/${d}-${e}`);
 }
 
 function normalizeCPF(text: string): string {
-  // CPF: XXX.XXX.XXX-XX
   return text.replace(/(\d{3})[\.\s]?(\d{3})[\.\s]?(\d{3})[-\s]?(\d{2})/g,
     (_, a, b, c, d) => `${a}.${b}.${c}-${d}`);
 }
 
 function applyOCRCorrections(text: string): string {
-  const corrections: Record<string, string> = {
-    "0": "O", "O": "0", // Context-dependent
-    "1": "I", "I": "1",
-    "5": "S", "S": "5",
-    "8": "B", "B": "8",
-    "6": "G", "G": "6",
-    "2": "Z", "Z": "2",
-  };
-  
-  // Apply corrections based on context
   let corrected = text;
-  
-  // In numeric contexts (KM, dates, measurements), replace letters with numbers
+  // In numeric contexts, replace letters with numbers
   corrected = corrected.replace(/(\d+[OISZGB]\d*|\d*[OISZGB]\d+)/g, (match) => {
     return match
       .replace(/O/g, "0")
@@ -132,14 +108,109 @@ function applyOCRCorrections(text: string): string {
       .replace(/G/g, "6")
       .replace(/B/g, "8");
   });
-  
   return corrected;
 }
 
-function calculateConfidence(value: string, entityType: string): { score: number; level: string } {
-  let score = 0.5; // Base score
+// Technical dictionary for OCR correction
+const TECH_DICTIONARY = {
+  // Common OCR mistakes -> correct
+  "pavlmento": "pavimento",
+  "asfalto": "asfalto",
+  "drenagern": "drenagem",
+  "concret0": "concreto",
+  "eletrica": "elétrica",
+  "sinalizaçao": "sinalização",
+  "terrap1enagem": "terraplenagem",
+  "rodov1a": "rodovia",
+  "compactaçao": "compactação",
+};
+
+function applyDictionary(text: string): string {
+  let result = text;
+  for (const [wrong, correct] of Object.entries(TECH_DICTIONARY)) {
+    result = result.replace(new RegExp(wrong, "gi"), correct);
+  }
+  return result;
+}
+
+// Extract entities using regex patterns
+function extractEntitiesFromText(text: string, templateType: string): Array<{type: string; value: string; confidence: number}> {
+  const entities: Array<{type: string; value: string; confidence: number}> = [];
   
-  // Increase confidence based on format matching
+  // Date patterns
+  const datePatterns = [
+    /(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/g,
+    /(\d{1,2})\s*de\s*(\w+)\s*de\s*(\d{2,4})/gi
+  ];
+  for (const pattern of datePatterns) {
+    const matches = text.matchAll(pattern);
+    for (const match of matches) {
+      entities.push({ type: "data", value: match[0], confidence: 0.85 });
+    }
+  }
+  
+  // KM patterns
+  const kmPattern = /km\s*(\d+[\+\,\.\s]?\d{0,3})/gi;
+  const kmMatches = text.matchAll(kmPattern);
+  for (const match of kmMatches) {
+    entities.push({ type: "km", value: match[0], confidence: 0.80 });
+  }
+  
+  // Plate patterns (Brazilian)
+  const platePattern = /([A-Z]{3})\s*[-]?\s*(\d[A-Z\d]\d{2})/gi;
+  const plateMatches = text.matchAll(platePattern);
+  for (const match of plateMatches) {
+    entities.push({ type: "placa", value: match[0], confidence: 0.90 });
+  }
+  
+  // CNPJ pattern
+  const cnpjPattern = /\d{2}[\.\s]?\d{3}[\.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/g;
+  const cnpjMatches = text.matchAll(cnpjPattern);
+  for (const match of cnpjMatches) {
+    entities.push({ type: "cnpj", value: match[0], confidence: 0.85 });
+  }
+  
+  // CPF pattern
+  const cpfPattern = /\d{3}[\.\s]?\d{3}[\.\s]?\d{3}[-\s]?\d{2}/g;
+  const cpfMatches = text.matchAll(cpfPattern);
+  for (const match of cpfMatches) {
+    entities.push({ type: "cpf", value: match[0], confidence: 0.85 });
+  }
+  
+  // Temperature (for pavimento)
+  const tempPattern = /(\d{2,3})\s*[°ºo]?\s*[cC]/g;
+  const tempMatches = text.matchAll(tempPattern);
+  for (const match of tempMatches) {
+    entities.push({ type: "temperatura", value: match[0], confidence: 0.75 });
+  }
+  
+  // Volume/quantity patterns
+  const volumePattern = /(\d+[\.,]?\d*)\s*(m³|m3|litros?|ton|kg)/gi;
+  const volumeMatches = text.matchAll(volumePattern);
+  for (const match of volumeMatches) {
+    entities.push({ type: "volume", value: match[0], confidence: 0.70 });
+  }
+  
+  // FCK (concrete)
+  const fckPattern = /fck\s*[:=]?\s*(\d{2,3})\s*(mpa)?/gi;
+  const fckMatches = text.matchAll(fckPattern);
+  for (const match of fckMatches) {
+    entities.push({ type: "fck", value: match[0], confidence: 0.85 });
+  }
+  
+  // Slump (concrete)
+  const slumpPattern = /slump\s*[:=]?\s*(\d{1,3})\s*(cm|mm)?/gi;
+  const slumpMatches = text.matchAll(slumpPattern);
+  for (const match of slumpMatches) {
+    entities.push({ type: "slump", value: match[0], confidence: 0.85 });
+  }
+  
+  return entities;
+}
+
+function calculateConfidence(value: string, entityType: string): { score: number; level: string } {
+  let score = 0.5;
+  
   switch (entityType) {
     case "data":
     case "date":
@@ -162,13 +233,160 @@ function calculateConfidence(value: string, entityType: string): { score: number
       if (/[A-Z]{3}-\d[A-Z\d]\d{2}/.test(value)) score = 0.90;
       break;
     default:
-      // For text entities, check length and common patterns
       if (value.length > 3 && value.length < 100) score = 0.70;
       if (value.length > 10 && value.length < 50) score = 0.80;
   }
   
   const level = score >= 0.80 ? "green" : score >= 0.60 ? "yellow" : "red";
   return { score: Math.round(score * 100), level };
+}
+
+// ============ OCR SERVICES ============
+
+// OCR.space API (Free tier: 25000 requests/month)
+async function callOcrSpace(imageUrl: string): Promise<{ text: string; confidence: number }> {
+  const apiKey = Deno.env.get("OCR_SPACE_API_KEY");
+  if (!apiKey) {
+    throw new Error("OCR_SPACE_API_KEY não configurada");
+  }
+  
+  console.log("[OCR.space] Iniciando OCR para:", imageUrl.substring(0, 50) + "...");
+  
+  const formData = new FormData();
+  formData.append("url", imageUrl);
+  formData.append("language", "por"); // Portuguese
+  formData.append("isOverlayRequired", "false");
+  formData.append("detectOrientation", "true");
+  formData.append("scale", "true");
+  formData.append("OCREngine", "2"); // Engine 2 is better for many cases
+  
+  const response = await fetch("https://api.ocr.space/parse/image", {
+    method: "POST",
+    headers: {
+      "apikey": apiKey,
+    },
+    body: formData,
+  });
+  
+  if (!response.ok) {
+    console.error("[OCR.space] Erro HTTP:", response.status);
+    throw new Error(`OCR.space error: ${response.status}`);
+  }
+  
+  const result = await response.json();
+  console.log("[OCR.space] Resposta recebida:", JSON.stringify(result).substring(0, 200));
+  
+  if (result.IsErroredOnProcessing) {
+    throw new Error(result.ErrorMessage?.[0] || "OCR.space processing error");
+  }
+  
+  const parsedResults = result.ParsedResults?.[0];
+  if (!parsedResults) {
+    return { text: "", confidence: 0 };
+  }
+  
+  // OCR.space returns confidence as a percentage string like "95.00"
+  const confidenceStr = parsedResults.TextOverlay?.Lines?.[0]?.Words?.[0]?.WordConfidence || "70";
+  const confidence = parseFloat(confidenceStr) / 100;
+  
+  return {
+    text: parsedResults.ParsedText || "",
+    confidence: isNaN(confidence) ? 0.7 : confidence
+  };
+}
+
+// AI Validation only for low confidence results (saves costs!)
+async function callAIValidation(
+  rawText: string, 
+  entities: Array<{type: string; value: string; confidence: number}>,
+  templateType: string
+): Promise<{
+  validations: Array<{entity_type: string; original_value: string; issue: string; suggestion: string; confidence: number}>;
+  missing_entities: Array<{entity_type: string; suggested_value: string; confidence: number; reasoning: string}>;
+  overall_quality: string;
+  summary: string;
+} | null> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) {
+    console.log("[AI] LOVABLE_API_KEY não configurada, pulando validação IA");
+    return null;
+  }
+  
+  const templateConfig = TEMPLATE_PATTERNS[templateType] || TEMPLATE_PATTERNS.civil_geral;
+  
+  // Only call AI if we have low confidence entities
+  const lowConfidenceEntities = entities.filter(e => e.confidence < 0.7);
+  if (lowConfidenceEntities.length === 0 && entities.length > 0) {
+    console.log("[AI] Todas entidades com alta confiança, pulando validação IA");
+    return {
+      validations: [],
+      missing_entities: [],
+      overall_quality: "good",
+      summary: "Texto OCR com alta confiança, sem necessidade de correção."
+    };
+  }
+  
+  console.log("[AI] Chamando Gemini para validação de", lowConfidenceEntities.length, "entidades");
+  
+  const validationPrompt = `Analise os dados extraídos de uma foto de obra civil e:
+
+1. VALIDE: Verifique se há inconsistências nos dados
+2. SUGIRA: Proponha correções para valores suspeitos
+3. PREENCHA: Sugira valores faltantes com base no contexto
+
+DADOS EXTRAÍDOS (${entities.length} entidades, ${lowConfidenceEntities.length} com baixa confiança):
+${JSON.stringify(entities, null, 2)}
+
+TEXTO OCR:
+${rawText.substring(0, 1000)}
+
+TEMPLATE: ${templateType}
+ENTIDADES ESPERADAS: ${templateConfig.entities.join(", ")}
+
+RETORNE APENAS JSON (sem markdown):
+{
+  "validations": [
+    {"entity_type": "tipo", "original_value": "valor", "issue": "problema", "suggestion": "sugestão", "confidence": 0.75}
+  ],
+  "missing_entities": [
+    {"entity_type": "tipo", "suggested_value": "valor", "confidence": 0.60, "reasoning": "motivo"}
+  ],
+  "overall_quality": "good|medium|poor",
+  "summary": "resumo curto"
+}`;
+
+  try {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-lite", // Usando modelo mais barato!
+        messages: [
+          { role: "system", content: "Você é um validador de dados OCR de obras civis. Responda apenas com JSON válido." },
+          { role: "user", content: validationPrompt }
+        ],
+        temperature: 0.1,
+        max_tokens: 1500
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("[AI] Erro na chamada:", response.status);
+      return null;
+    }
+
+    const aiResponse = await response.json();
+    const content = aiResponse.choices?.[0]?.message?.content || "";
+    
+    const jsonStr = content.replace(/```json\n?|\n?```/g, "").trim();
+    return JSON.parse(jsonStr);
+  } catch (error) {
+    console.error("[AI] Erro ao processar resposta:", error);
+    return null;
+  }
 }
 
 serve(async (req) => {
@@ -183,12 +401,14 @@ serve(async (req) => {
       throw new Error("photoRecordId e imageUrl são obrigatórios");
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    console.log("[PROCESS] Iniciando processamento:", { photoRecordId, templateType });
+
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY não configurada");
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error("Supabase não configurado");
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error("Supabase não configurado");
+    }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -201,126 +421,69 @@ serve(async (req) => {
       })
       .eq("id", photoRecordId);
 
-    // Get template configuration
-    const templateConfig = TEMPLATE_PATTERNS[templateType] || TEMPLATE_PATTERNS.civil_geral;
+    // ============ STEP 1: OCR with OCR.space (FREE) ============
+    let rawText = "";
+    let ocrConfidence = 0;
+    let ocrSource = "ocr.space";
     
-    // Build the prompt for Gemini Vision OCR
-    const systemPrompt = `Você é um sistema especializado em OCR para documentos de obras civis em português e inglês.
-
-TAREFA: Extraia TODO o texto visível na imagem com máxima precisão.
-
-ENTIDADES A IDENTIFICAR (template: ${templateType}):
-${templateConfig.entities.map(e => `- ${e}`).join("\n")}
-
-PALAVRAS-CHAVE DO TEMPLATE:
-PT: ${templateConfig.keywords.pt.join(", ")}
-EN: ${templateConfig.keywords.en.join(", ")}
-
-FORMATO DE RESPOSTA (JSON estrito):
-{
-  "raw_text": "texto completo extraído da imagem",
-  "entities": [
-    {
-      "type": "tipo_entidade",
-      "value": "valor extraído",
-      "confidence": 0.85
-    }
-  ],
-  "detected_language": "pt|en|mixed",
-  "template_match_score": 0.75
-}
-
-REGRAS:
-1. Extraia EXATAMENTE o que está na imagem, sem inventar
-2. Normalize datas para DD/MM/YYYY
-3. Normalize KM para formato KM XXX+YYY
-4. Identifique placas de veículos (ABC-1234 ou ABC1D23)
-5. Identifique CNPJ (XX.XXX.XXX/XXXX-XX) e CPF (XXX.XXX.XXX-XX)
-6. Use confidence 0.0-1.0 baseado na clareza da leitura
-7. Se não conseguir ler algo, retorne confidence baixa`;
-
-    // Call Gemini Vision for OCR
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { 
-            role: "user", 
-            content: [
-              { 
-                type: "text", 
-                text: "Extraia o texto e entidades desta foto de obra. Retorne APENAS o JSON, sem markdown." 
-              },
-              { 
-                type: "image_url", 
-                image_url: { url: imageUrl } 
-              }
-            ]
-          }
-        ],
-        temperature: 0.1,
-        max_tokens: 4000
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("AI Gateway error:", response.status, errorText);
-      
-      if (response.status === 429) {
-        throw new Error("Rate limit excedido. Tente novamente em alguns minutos.");
-      }
-      if (response.status === 402) {
-        throw new Error("Créditos insuficientes. Adicione créditos ao workspace.");
-      }
-      throw new Error(`Erro no processamento OCR: ${response.status}`);
-    }
-
-    const aiResponse = await response.json();
-    const content = aiResponse.choices?.[0]?.message?.content || "";
-    
-    // Parse the JSON response
-    let ocrResult;
     try {
-      // Clean markdown if present
-      const jsonStr = content.replace(/```json\n?|\n?```/g, "").trim();
-      ocrResult = JSON.parse(jsonStr);
-    } catch (e) {
-      console.error("Failed to parse OCR result:", content);
-      ocrResult = {
-        raw_text: content,
-        entities: [],
-        detected_language: "unknown",
-        template_match_score: 0
-      };
+      const ocrResult = await callOcrSpace(imageUrl);
+      rawText = ocrResult.text;
+      ocrConfidence = ocrResult.confidence;
+      console.log("[OCR] OCR.space sucesso, confiança:", ocrConfidence);
+    } catch (ocrError) {
+      console.error("[OCR] OCR.space falhou:", ocrError);
+      // If OCR.space fails, we still continue but with empty text
+      rawText = "";
+      ocrConfidence = 0;
     }
 
-    // Post-process the OCR text
-    let processedText = ocrResult.raw_text || "";
+    // ============ STEP 2: Post-processing (FREE - runs locally) ============
+    let processedText = rawText;
     processedText = applyOCRCorrections(processedText);
+    processedText = applyDictionary(processedText);
     processedText = normalizeDate(processedText);
     processedText = normalizeKm(processedText);
     processedText = normalizePlate(processedText);
     processedText = normalizeCNPJ(processedText);
     processedText = normalizeCPF(processedText);
+    
+    console.log("[POST] Texto processado:", processedText.substring(0, 200) + "...");
+
+    // ============ STEP 3: Extract entities with regex (FREE) ============
+    const extractedEntities = extractEntitiesFromText(processedText, templateType);
+    console.log("[EXTRACT] Entidades extraídas:", extractedEntities.length);
 
     // Calculate overall confidence
-    const overallConfidence = ocrResult.entities?.length > 0
-      ? ocrResult.entities.reduce((sum: number, e: any) => sum + (e.confidence || 0), 0) / ocrResult.entities.length
-      : 0.5;
+    const overallConfidence = extractedEntities.length > 0
+      ? extractedEntities.reduce((sum, e) => sum + e.confidence, 0) / extractedEntities.length
+      : ocrConfidence;
 
-    // Update photo record with OCR results
+    // ============ STEP 4: AI Validation ONLY if needed (saves $$$) ============
+    let validationResult = null;
+    const hasLowConfidence = extractedEntities.some(e => e.confidence < 0.7) || ocrConfidence < 0.7;
+    
+    if (hasLowConfidence) {
+      console.log("[AI] Baixa confiança detectada, chamando IA para validação...");
+      validationResult = await callAIValidation(processedText, extractedEntities, templateType);
+    } else {
+      console.log("[AI] Alta confiança, pulando chamada de IA (economia!)");
+      validationResult = {
+        validations: [],
+        missing_entities: [],
+        overall_quality: "good",
+        summary: "OCR com alta confiança, sem necessidade de validação IA."
+      };
+    }
+
+    // ============ STEP 5: Save results ============
+    
+    // Update photo record
     await supabase
       .from("photo_records")
       .update({
         ocr_status: "completed",
-        ocr_raw_text: ocrResult.raw_text,
+        ocr_raw_text: rawText,
         ocr_processed_text: processedText,
         ocr_confidence: Math.round(overallConfidence * 100),
         processing_completed_at: new Date().toISOString()
@@ -328,87 +491,19 @@ REGRAS:
       .eq("id", photoRecordId);
 
     // Insert extracted entities
-    if (ocrResult.entities && ocrResult.entities.length > 0) {
-      const entitiesData = ocrResult.entities.map((entity: any) => {
+    if (extractedEntities.length > 0) {
+      const entitiesData = extractedEntities.map((entity) => {
         const conf = calculateConfidence(entity.value, entity.type);
         return {
           photo_record_id: photoRecordId,
           entity_type: entity.type,
           entity_value: entity.value,
-          confidence_score: entity.confidence ? Math.round(entity.confidence * 100) : conf.score,
+          confidence_score: Math.round(entity.confidence * 100),
           confidence_level: conf.level
         };
       });
 
       await supabase.from("extracted_entities").insert(entitiesData);
-    }
-
-    // AI Validation Pass - Check for inconsistencies and suggest corrections
-    const validationPrompt = `Analise os dados extraídos de uma foto de obra civil e:
-
-1. VALIDE: Verifique se há inconsistências nos dados
-2. SUGIRA: Proponha correções para valores suspeitos
-3. PREENCHA: Sugira valores faltantes com base no contexto
-
-DADOS EXTRAÍDOS:
-${JSON.stringify(ocrResult.entities, null, 2)}
-
-TEXTO PROCESSADO:
-${processedText}
-
-TEMPLATE: ${templateType}
-ENTIDADES ESPERADAS: ${templateConfig.entities.join(", ")}
-
-RETORNE JSON:
-{
-  "validations": [
-    {
-      "entity_type": "tipo",
-      "original_value": "valor original",
-      "issue": "descrição do problema",
-      "suggestion": "valor sugerido",
-      "confidence": 0.75
-    }
-  ],
-  "missing_entities": [
-    {
-      "entity_type": "tipo",
-      "suggested_value": "valor sugerido",
-      "confidence": 0.60,
-      "reasoning": "motivo da sugestão"
-    }
-  ],
-  "overall_quality": "good|medium|poor",
-  "summary": "resumo da análise"
-}`;
-
-    const validationResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: "Você é um especialista em validação de dados de obras civis." },
-          { role: "user", content: validationPrompt }
-        ],
-        temperature: 0.2,
-        max_tokens: 2000
-      }),
-    });
-
-    let validationResult = null;
-    if (validationResponse.ok) {
-      const valResponse = await validationResponse.json();
-      const valContent = valResponse.choices?.[0]?.message?.content || "";
-      try {
-        const jsonStr = valContent.replace(/```json\n?|\n?```/g, "").trim();
-        validationResult = JSON.parse(jsonStr);
-      } catch (e) {
-        console.error("Failed to parse validation result:", valContent);
-      }
     }
 
     // Update entities with AI suggestions if available
@@ -426,8 +521,8 @@ RETORNE JSON:
     }
 
     // Insert missing entities suggested by AI
-    if (validationResult?.missing_entities) {
-      const missingData = validationResult.missing_entities.map((entity: any) => ({
+    if (validationResult?.missing_entities && validationResult.missing_entities.length > 0) {
+      const missingData = validationResult.missing_entities.map((entity) => ({
         photo_record_id: photoRecordId,
         entity_type: entity.entity_type,
         entity_value: entity.suggested_value,
@@ -436,18 +531,18 @@ RETORNE JSON:
         ai_suggestion: entity.reasoning
       }));
 
-      if (missingData.length > 0) {
-        await supabase.from("extracted_entities").insert(missingData);
-      }
+      await supabase.from("extracted_entities").insert(missingData);
     }
 
     // Create OCR report
     const reportData = {
-      ocr_result: ocrResult,
+      ocr_source: ocrSource,
+      ocr_confidence: ocrConfidence,
       processed_text: processedText,
       validation: validationResult,
       template_type: templateType,
-      template_entities: templateConfig.entities
+      entities_count: extractedEntities.length,
+      ai_called: hasLowConfidence
     };
 
     await supabase.from("ocr_reports").insert({
@@ -458,23 +553,29 @@ RETORNE JSON:
       status: validationResult?.overall_quality === "good" ? "approved" : "review"
     });
 
+    console.log("[PROCESS] Concluído com sucesso!");
+
     return new Response(
       JSON.stringify({
         success: true,
         photoRecordId,
-        ocrConfidence: Math.round(overallConfidence * 100),
-        entitiesCount: ocrResult.entities?.length || 0,
+        ocrSource,
+        ocrConfidence: Math.round(ocrConfidence * 100),
+        overallConfidence: Math.round(overallConfidence * 100),
+        entitiesCount: extractedEntities.length,
+        aiCalled: hasLowConfidence,
         validation: validationResult?.overall_quality || "unknown"
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
   } catch (error) {
-    console.error("Process photo error:", error);
+    console.error("[ERROR] Erro no processamento:", error);
     
     // Try to update the photo record with error status
     try {
-      const { photoRecordId } = await req.json().catch(() => ({}));
+      const body = await req.clone().json().catch(() => ({}));
+      const photoRecordId = body.photoRecordId;
       if (photoRecordId) {
         const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
         const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -490,7 +591,7 @@ RETORNE JSON:
         }
       }
     } catch (e) {
-      console.error("Failed to update error status:", e);
+      console.error("[ERROR] Falha ao atualizar status de erro:", e);
     }
 
     return new Response(
