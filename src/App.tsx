@@ -9,6 +9,7 @@ import Dashboard from "./pages/Dashboard";
 import Capture from "./pages/Capture";
 import Pending from "./pages/Pending";
 import Photos from "./pages/Photos";
+import PhotoDetail from "./pages/PhotoDetail";
 import Profile from "./pages/Profile";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
@@ -42,6 +43,7 @@ function AppRoutes() {
       <Route path="/capture" element={<ProtectedRoute><Capture /></ProtectedRoute>} />
       <Route path="/pending" element={<ProtectedRoute><Pending /></ProtectedRoute>} />
       <Route path="/photos" element={<ProtectedRoute><Photos /></ProtectedRoute>} />
+      <Route path="/photos/:id" element={<ProtectedRoute><PhotoDetail /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />

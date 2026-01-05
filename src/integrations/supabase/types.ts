@@ -38,6 +38,110 @@ export type Database = {
         }
         Relationships: []
       }
+      extracted_entities: {
+        Row: {
+          ai_suggestion: string | null
+          confidence_level: string
+          confidence_score: number
+          created_at: string
+          entity_type: string
+          entity_value: string
+          id: string
+          is_validated: boolean | null
+          photo_record_id: string
+          updated_at: string
+          validated_value: string | null
+        }
+        Insert: {
+          ai_suggestion?: string | null
+          confidence_level?: string
+          confidence_score?: number
+          created_at?: string
+          entity_type: string
+          entity_value: string
+          id?: string
+          is_validated?: boolean | null
+          photo_record_id: string
+          updated_at?: string
+          validated_value?: string | null
+        }
+        Update: {
+          ai_suggestion?: string | null
+          confidence_level?: string
+          confidence_score?: number
+          created_at?: string
+          entity_type?: string
+          entity_value?: string
+          id?: string
+          is_validated?: boolean | null
+          photo_record_id?: string
+          updated_at?: string
+          validated_value?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extracted_entities_photo_record_id_fkey"
+            columns: ["photo_record_id"]
+            isOneToOne: false
+            referencedRelation: "photo_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ocr_reports: {
+        Row: {
+          created_at: string
+          file_url: string | null
+          id: string
+          overall_confidence: number | null
+          photo_record_id: string
+          report_data: Json
+          report_type: string
+          status: string
+          template_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          file_url?: string | null
+          id?: string
+          overall_confidence?: number | null
+          photo_record_id: string
+          report_data?: Json
+          report_type?: string
+          status?: string
+          template_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          file_url?: string | null
+          id?: string
+          overall_confidence?: number | null
+          photo_record_id?: string
+          report_data?: Json
+          report_type?: string
+          status?: string
+          template_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ocr_reports_photo_record_id_fkey"
+            columns: ["photo_record_id"]
+            isOneToOne: false
+            referencedRelation: "photo_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ocr_reports_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       photo_records: {
         Row: {
           accuracy: number | null
@@ -50,6 +154,13 @@ export type Database = {
           id: string
           latitude: number | null
           longitude: number | null
+          ocr_confidence: number | null
+          ocr_processed_text: string | null
+          ocr_raw_text: string | null
+          ocr_status: string | null
+          processing_completed_at: string | null
+          processing_error: string | null
+          processing_started_at: string | null
           project_id: string
           server_timestamp: string
           show_stamp: boolean
@@ -68,6 +179,13 @@ export type Database = {
           id?: string
           latitude?: number | null
           longitude?: number | null
+          ocr_confidence?: number | null
+          ocr_processed_text?: string | null
+          ocr_raw_text?: string | null
+          ocr_status?: string | null
+          processing_completed_at?: string | null
+          processing_error?: string | null
+          processing_started_at?: string | null
           project_id: string
           server_timestamp?: string
           show_stamp?: boolean
@@ -86,6 +204,13 @@ export type Database = {
           id?: string
           latitude?: number | null
           longitude?: number | null
+          ocr_confidence?: number | null
+          ocr_processed_text?: string | null
+          ocr_raw_text?: string | null
+          ocr_status?: string | null
+          processing_completed_at?: string | null
+          processing_error?: string | null
+          processing_started_at?: string | null
           project_id?: string
           server_timestamp?: string
           show_stamp?: boolean
@@ -172,6 +297,41 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      template_configs: {
+        Row: {
+          config_key: string
+          config_value: Json
+          created_at: string
+          id: string
+          template_id: string
+          updated_at: string
+        }
+        Insert: {
+          config_key: string
+          config_value?: Json
+          created_at?: string
+          id?: string
+          template_id: string
+          updated_at?: string
+        }
+        Update: {
+          config_key?: string
+          config_value?: Json
+          created_at?: string
+          id?: string
+          template_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_configs_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
             referencedColumns: ["id"]
           },
         ]
