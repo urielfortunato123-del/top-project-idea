@@ -1,13 +1,22 @@
 import { cn } from '@/lib/utils';
 
-interface ConfidenceBadgeProps {
-  level: 'green' | 'yellow' | 'red';
+export interface ConfidenceBadgeProps {
+  level?: 'green' | 'yellow' | 'red';
   score?: number;
   size?: 'sm' | 'md' | 'lg';
   showScore?: boolean;
 }
 
+function getLevel(score: number | undefined): 'green' | 'yellow' | 'red' {
+  if (score === undefined) return 'red';
+  if (score >= 80) return 'green';
+  if (score >= 60) return 'yellow';
+  return 'red';
+}
+
 export function ConfidenceBadge({ level, score, size = 'md', showScore = true }: ConfidenceBadgeProps) {
+  const computedLevel = level || getLevel(score);
+  
   const sizeClasses = {
     sm: 'h-2 w-2',
     md: 'h-3 w-3',
@@ -32,7 +41,7 @@ export function ConfidenceBadge({ level, score, size = 'md', showScore = true }:
         className={cn(
           'rounded-full shadow-lg',
           sizeClasses[size],
-          colorClasses[level]
+          colorClasses[computedLevel]
         )}
       />
       {showScore && score !== undefined && (

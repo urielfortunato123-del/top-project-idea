@@ -26,6 +26,10 @@ export interface PhotoRecord {
   status: string;
   show_stamp: boolean;
   created_at: string;
+  ocr_status: string | null;
+  ocr_confidence: number | null;
+  ocr_raw_text: string | null;
+  ocr_processed_text: string | null;
   companies?: { name: string };
   projects?: { name: string };
   templates?: { name: string; icon: string } | null;
