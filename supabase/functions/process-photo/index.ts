@@ -295,14 +295,150 @@ async function callOcrSpace(imageUrl: string): Promise<{ text: string; confidenc
   };
 }
 
+// Inconsistency detection rules (runs locally, free!)
+function detectInconsistencies(entities: Array<{type: string; value: string; confidence: number}>): Array<{
+  entity_type: string;
+  issue: string;
+  severity: 'error' | 'warning' | 'info';
+}> {
+  const issues: Array<{entity_type: string; issue: string; severity: 'error' | 'warning' | 'info'}> = [];
+  
+  // Find KM pairs
+  const kmInicio = entities.find(e => e.type === 'km_inicio' || (e.type === 'km' && e.value.toLowerCase().includes('inicio')));
+  const kmFim = entities.find(e => e.type === 'km_fim' || (e.type === 'km' && e.value.toLowerCase().includes('fim')));
+  
+  if (kmInicio && kmFim) {
+    const parseKm = (val: string): number => {
+      const match = val.match(/(\d+)[\+\,\.]?(\d{0,3})/);
+      if (match) return parseFloat(`${match[1]}.${match[2] || '0'}`);
+      return 0;
+    };
+    const inicio = parseKm(kmInicio.value);
+    const fim = parseKm(kmFim.value);
+    
+    if (fim < inicio) {
+      issues.push({
+        entity_type: 'km',
+        issue: `KM final (${fim}) menor que KM inicial (${inicio})`,
+        severity: 'error'
+      });
+    } else if (fim - inicio > 10) {
+      issues.push({
+        entity_type: 'km',
+        issue: `Extensão muito grande (${(fim - inicio).toFixed(1)} km) - verificar`,
+        severity: 'warning'
+      });
+    }
+  }
+  
+  // Check dates
+  const dateEntities = entities.filter(e => e.type === 'data' || e.type === 'date');
+  for (const dateEntity of dateEntities) {
+    const match = dateEntity.value.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
+    if (match) {
+      const day = parseInt(match[1]);
+      const month = parseInt(match[2]);
+      const year = parseInt(match[3]);
+      
+      if (day > 31 || day < 1) {
+        issues.push({ entity_type: 'data', issue: `Dia inválido: ${day}`, severity: 'error' });
+      }
+      if (month > 12 || month < 1) {
+        issues.push({ entity_type: 'data', issue: `Mês inválido: ${month}`, severity: 'error' });
+      }
+      if (year < 2000 || year > 2100) {
+        issues.push({ entity_type: 'data', issue: `Ano suspeito: ${year}`, severity: 'warning' });
+      }
+      
+      // Check if date is in the future
+      const fullYear = year < 100 ? 2000 + year : year;
+      const dateObj = new Date(fullYear, month - 1, day);
+      if (dateObj > new Date()) {
+        issues.push({ entity_type: 'data', issue: `Data no futuro: ${dateEntity.value}`, severity: 'warning' });
+      }
+    }
+  }
+  
+  // Check temperatures (for paving)
+  const tempEntities = entities.filter(e => e.type === 'temperatura');
+  for (const temp of tempEntities) {
+    const match = temp.value.match(/(\d{2,3})/);
+    if (match) {
+      const tempValue = parseInt(match[1]);
+      if (tempValue < 100 || tempValue > 180) {
+        issues.push({
+          entity_type: 'temperatura',
+          issue: `Temperatura de asfalto fora do padrão (${tempValue}°C)`,
+          severity: tempValue < 80 || tempValue > 200 ? 'error' : 'warning'
+        });
+      }
+    }
+  }
+  
+  // Check FCK values (concrete)
+  const fckEntities = entities.filter(e => e.type === 'fck');
+  for (const fck of fckEntities) {
+    const match = fck.value.match(/(\d{2,3})/);
+    if (match) {
+      const fckValue = parseInt(match[1]);
+      const validFck = [20, 25, 30, 35, 40, 45, 50];
+      if (!validFck.includes(fckValue)) {
+        issues.push({
+          entity_type: 'fck',
+          issue: `FCK não padrão: ${fckValue} (valores comuns: 20, 25, 30, 35, 40)`,
+          severity: 'warning'
+        });
+      }
+    }
+  }
+  
+  // Check slump values (concrete)
+  const slumpEntities = entities.filter(e => e.type === 'slump');
+  for (const slump of slumpEntities) {
+    const match = slump.value.match(/(\d{1,3})/);
+    if (match) {
+      const slumpValue = parseInt(match[1]);
+      if (slumpValue < 5 || slumpValue > 22) {
+        issues.push({
+          entity_type: 'slump',
+          issue: `Slump fora do padrão (${slumpValue}cm) - normal: 10±2cm`,
+          severity: slumpValue < 2 || slumpValue > 25 ? 'error' : 'warning'
+        });
+      }
+    }
+  }
+  
+  // Check CNPJ checksum (basic validation)
+  const cnpjEntities = entities.filter(e => e.type === 'cnpj');
+  for (const cnpj of cnpjEntities) {
+    const digits = cnpj.value.replace(/\D/g, '');
+    if (digits.length !== 14) {
+      issues.push({ entity_type: 'cnpj', issue: `CNPJ com tamanho incorreto: ${digits.length} dígitos`, severity: 'error' });
+    }
+  }
+  
+  // Check CPF length
+  const cpfEntities = entities.filter(e => e.type === 'cpf');
+  for (const cpf of cpfEntities) {
+    const digits = cpf.value.replace(/\D/g, '');
+    if (digits.length !== 11) {
+      issues.push({ entity_type: 'cpf', issue: `CPF com tamanho incorreto: ${digits.length} dígitos`, severity: 'error' });
+    }
+  }
+  
+  return issues;
+}
+
 // AI Validation only for low confidence results (saves costs!)
 async function callAIValidation(
   rawText: string, 
   entities: Array<{type: string; value: string; confidence: number}>,
-  templateType: string
+  templateType: string,
+  inconsistencies: Array<{entity_type: string; issue: string; severity: string}>
 ): Promise<{
   validations: Array<{entity_type: string; original_value: string; issue: string; suggestion: string; confidence: number}>;
   missing_entities: Array<{entity_type: string; suggested_value: string; confidence: number; reasoning: string}>;
+  inconsistencies: Array<{entity_type: string; issue: string; severity: string; suggestion: string}>;
   overall_quality: string;
   summary: string;
 } | null> {
@@ -314,28 +450,35 @@ async function callAIValidation(
   
   const templateConfig = TEMPLATE_PATTERNS[templateType] || TEMPLATE_PATTERNS.civil_geral;
   
-  // Only call AI if we have low confidence entities
+  // Only call AI if we have low confidence entities OR inconsistencies
   const lowConfidenceEntities = entities.filter(e => e.confidence < 0.7);
-  if (lowConfidenceEntities.length === 0 && entities.length > 0) {
+  const hasIssues = inconsistencies.length > 0;
+  
+  if (lowConfidenceEntities.length === 0 && entities.length > 0 && !hasIssues) {
     console.log("[AI] Todas entidades com alta confiança, pulando validação IA");
     return {
       validations: [],
       missing_entities: [],
+      inconsistencies: [],
       overall_quality: "good",
       summary: "Texto OCR com alta confiança, sem necessidade de correção."
     };
   }
   
-  console.log("[AI] Chamando Gemini para validação de", lowConfidenceEntities.length, "entidades");
+  console.log("[AI] Chamando Gemini para validação de", lowConfidenceEntities.length, "entidades e", inconsistencies.length, "inconsistências");
   
   const validationPrompt = `Analise os dados extraídos de uma foto de obra civil e:
 
 1. VALIDE: Verifique se há inconsistências nos dados
 2. SUGIRA: Proponha correções para valores suspeitos
 3. PREENCHA: Sugira valores faltantes com base no contexto
+4. CORRIJA INCOERÊNCIAS: Analise as inconsistências detectadas e sugira correções
 
 DADOS EXTRAÍDOS (${entities.length} entidades, ${lowConfidenceEntities.length} com baixa confiança):
 ${JSON.stringify(entities, null, 2)}
+
+INCONSISTÊNCIAS DETECTADAS (${inconsistencies.length}):
+${JSON.stringify(inconsistencies, null, 2)}
 
 TEXTO OCR:
 ${rawText.substring(0, 1000)}
@@ -350,6 +493,9 @@ RETORNE APENAS JSON (sem markdown):
   ],
   "missing_entities": [
     {"entity_type": "tipo", "suggested_value": "valor", "confidence": 0.60, "reasoning": "motivo"}
+  ],
+  "inconsistencies": [
+    {"entity_type": "tipo", "issue": "problema", "severity": "error|warning|info", "suggestion": "como corrigir"}
   ],
   "overall_quality": "good|medium|poor",
   "summary": "resumo curto"
@@ -555,6 +701,10 @@ serve(async (req) => {
     const extractedEntities = extractEntitiesFromText(processedText, templateType);
     console.log("[EXTRACT] Entidades extraídas:", extractedEntities.length);
 
+    // ============ STEP 3.5: Detect inconsistencies (FREE) ============
+    const inconsistencies = detectInconsistencies(extractedEntities);
+    console.log("[INCONSISTENCIES] Detectadas:", inconsistencies.length);
+
     // Calculate overall confidence
     const overallConfidence = extractedEntities.length > 0
       ? extractedEntities.reduce((sum, e) => sum + e.confidence, 0) / extractedEntities.length
@@ -563,15 +713,17 @@ serve(async (req) => {
     // ============ STEP 4: AI Validation ONLY if needed (saves $$$) ============
     let validationResult = null;
     const hasLowConfidence = extractedEntities.some(e => e.confidence < 0.7) || ocrConfidence < 0.7;
+    const hasInconsistencies = inconsistencies.length > 0;
     
-    if (hasLowConfidence) {
-      console.log("[AI] Baixa confiança detectada, chamando IA para validação...");
-      validationResult = await callAIValidation(processedText, extractedEntities, templateType);
+    if (hasLowConfidence || hasInconsistencies) {
+      console.log("[AI] Baixa confiança ou inconsistências detectadas, chamando IA para validação...");
+      validationResult = await callAIValidation(processedText, extractedEntities, templateType, inconsistencies);
     } else {
       console.log("[AI] Alta confiança, pulando chamada de IA (economia!)");
       validationResult = {
         validations: [],
         missing_entities: [],
+        inconsistencies: [],
         overall_quality: "good",
         summary: "OCR com alta confiança, sem necessidade de validação IA."
       };
@@ -641,9 +793,10 @@ serve(async (req) => {
       ocr_confidence: ocrConfidence,
       processed_text: processedText,
       validation: validationResult,
+      inconsistencies: inconsistencies,
       template_type: templateType,
       entities_count: extractedEntities.length,
-      ai_called: hasLowConfidence
+      ai_called: hasLowConfidence || hasInconsistencies
     };
 
     await supabase.from("ocr_reports").insert({

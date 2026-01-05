@@ -12,6 +12,9 @@ import Photos from "./pages/Photos";
 import PhotoDetail from "./pages/PhotoDetail";
 import Profile from "./pages/Profile";
 import Admin from "./pages/Admin";
+import AdminDashboard from "./pages/AdminDashboard";
+import PhotoBrowser from "./pages/PhotoBrowser";
+import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -46,6 +49,9 @@ function AppRoutes() {
       <Route path="/photos/:id" element={<ProtectedRoute><PhotoDetail /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+      <Route path="/admin-dashboard" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+      <Route path="/photo-browser" element={<ProtectedRoute><PhotoBrowser /></ProtectedRoute>} />
+      <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

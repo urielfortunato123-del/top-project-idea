@@ -6,7 +6,7 @@ import { BottomNav } from '@/components/BottomNav';
 import { SyncIndicator } from '@/components/SyncIndicator';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Camera, Images, Clock, CheckCircle, AlertCircle, CloudUpload, RefreshCw } from 'lucide-react';
+import { Camera, Images, Clock, CheckCircle, AlertCircle, CloudUpload, RefreshCw, BarChart3 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Dashboard() {
@@ -147,6 +147,18 @@ export default function Dashboard() {
               <span className="text-sm">Minhas Fotos</span>
             </Button>
           </div>
+
+          {isAdmin && (
+            <Button
+              size="lg"
+              variant="secondary"
+              className="w-full h-auto py-4 flex-row gap-3"
+              onClick={() => navigate('/admin-dashboard')}
+            >
+              <BarChart3 className="h-6 w-6" />
+              <span className="font-semibold">Painel Administrativo</span>
+            </Button>
+          )}
         </section>
 
         {/* Stats */}
