@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useAdminStats } from '@/hooks/usePhotoTree';
 import { usePhotoRecords } from '@/hooks/usePhotos';
 import { BottomNav } from '@/components/BottomNav';
+import { BatchOCRPanel } from '@/components/BatchOCRPanel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -174,6 +175,9 @@ export default function AdminDashboard() {
             )}
           </CardContent>
         </Card>
+
+        {/* Batch OCR Reprocessing */}
+        <BatchOCRPanel />
 
         {/* Quick Actions */}
         <section className="space-y-3">
