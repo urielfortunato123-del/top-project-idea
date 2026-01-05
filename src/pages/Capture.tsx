@@ -199,13 +199,13 @@ export default function Capture() {
             {/* Template */}
             <div className="space-y-2">
               <Label>Template/Frente (opcional)</Label>
-              <Select value={templateId} onValueChange={setTemplateId}>
+              <Select value={templateId} onValueChange={(v) => setTemplateId(v === "auto" ? "" : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Automático" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Automático</SelectItem>
-                  {templates.map(template => (
+                  <SelectItem value="auto">Automático</SelectItem>
+                  {templates.filter(t => t.id && t.id.trim() !== "").map(template => (
                     <SelectItem key={template.id} value={template.id}>
                       {template.icon} {template.name}
                     </SelectItem>
