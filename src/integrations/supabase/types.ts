@@ -88,6 +88,42 @@ export type Database = {
           },
         ]
       }
+      ocr_cache: {
+        Row: {
+          created_at: string
+          expires_at: string
+          extracted_entities: Json | null
+          id: string
+          image_hash: string
+          ocr_confidence: number | null
+          ocr_processed_text: string | null
+          ocr_raw_text: string | null
+          template_type: string | null
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          extracted_entities?: Json | null
+          id?: string
+          image_hash: string
+          ocr_confidence?: number | null
+          ocr_processed_text?: string | null
+          ocr_raw_text?: string | null
+          template_type?: string | null
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          extracted_entities?: Json | null
+          id?: string
+          image_hash?: string
+          ocr_confidence?: number | null
+          ocr_processed_text?: string | null
+          ocr_raw_text?: string | null
+          template_type?: string | null
+        }
+        Relationships: []
+      }
       ocr_reports: {
         Row: {
           created_at: string
@@ -412,6 +448,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_expired_ocr_cache: { Args: never; Returns: number }
       has_project_access: {
         Args: { _project_id: string; _user_id: string }
         Returns: boolean

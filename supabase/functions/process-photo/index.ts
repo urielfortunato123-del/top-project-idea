@@ -389,6 +389,33 @@ RETORNE APENAS JSON (sem markdown):
   }
 }
 
+// Generate image hash from URL (for cache lookup)
+async function generateImageHash(imageUrl: string): Promise<string> {
+  try {
+    // Fetch image data
+    const response = await fetch(imageUrl);
+    if (!response.ok) throw new Error("Failed to fetch image");
+    
+    const arrayBuffer = await response.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+    
+    // Use Web Crypto API to generate SHA-256 hash
+    const hashBuffer = await crypto.subtle.digest("SHA-256", uint8Array);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+    
+    return hashHex;
+  } catch (error) {
+    console.error("[CACHE] Erro ao gerar hash:", error);
+    // Fallback: use URL as hash (not ideal but functional)
+    const encoder = new TextEncoder();
+    const data = encoder.encode(imageUrl);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -411,6 +438,80 @@ serve(async (req) => {
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // ============ STEP 0: Check cache ============
+    console.log("[CACHE] Gerando hash da imagem...");
+    const imageHash = await generateImageHash(imageUrl);
+    console.log("[CACHE] Hash gerado:", imageHash.substring(0, 16) + "...");
+    
+    // Check if we have cached result for this image+template
+    const { data: cachedResult } = await supabase
+      .from("ocr_cache")
+      .select("*")
+      .eq("image_hash", imageHash)
+      .eq("template_type", templateType)
+      .gt("expires_at", new Date().toISOString())
+      .single();
+    
+    if (cachedResult) {
+      console.log("[CACHE] ✅ Cache hit! Usando resultado em cache.");
+      
+      // Apply cached results to this photo record
+      await supabase
+        .from("photo_records")
+        .update({
+          ocr_status: "completed",
+          ocr_raw_text: cachedResult.ocr_raw_text,
+          ocr_processed_text: cachedResult.ocr_processed_text,
+          ocr_confidence: cachedResult.ocr_confidence,
+          processing_started_at: new Date().toISOString(),
+          processing_completed_at: new Date().toISOString()
+        })
+        .eq("id", photoRecordId);
+      
+      // Insert cached entities
+      if (cachedResult.extracted_entities && Array.isArray(cachedResult.extracted_entities)) {
+        const entitiesData = cachedResult.extracted_entities.map((entity: any) => ({
+          ...entity,
+          id: undefined, // Let Supabase generate new IDs
+          photo_record_id: photoRecordId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }));
+        
+        if (entitiesData.length > 0) {
+          await supabase.from("extracted_entities").insert(entitiesData);
+        }
+      }
+      
+      // Create OCR report from cache
+      await supabase.from("ocr_reports").insert({
+        photo_record_id: photoRecordId,
+        report_type: "structured",
+        report_data: {
+          ...cachedResult.extracted_entities,
+          from_cache: true,
+          cache_id: cachedResult.id
+        },
+        overall_confidence: cachedResult.ocr_confidence,
+        status: cachedResult.ocr_confidence >= 80 ? "approved" : "review"
+      });
+      
+      return new Response(
+        JSON.stringify({
+          success: true,
+          photoRecordId,
+          fromCache: true,
+          cacheId: cachedResult.id,
+          ocrConfidence: cachedResult.ocr_confidence,
+          overallConfidence: cachedResult.ocr_confidence,
+          entitiesCount: cachedResult.extracted_entities?.length || 0
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    console.log("[CACHE] ❌ Cache miss. Processando imagem...");
 
     // Update status to processing
     await supabase
@@ -553,12 +654,47 @@ serve(async (req) => {
       status: validationResult?.overall_quality === "good" ? "approved" : "review"
     });
 
+    // ============ STEP 6: Save to cache ============
+    const entitiesToCache = extractedEntities.map((entity) => {
+      const conf = calculateConfidence(entity.value, entity.type);
+      return {
+        entity_type: entity.type,
+        entity_value: entity.value,
+        confidence_score: Math.round(entity.confidence * 100),
+        confidence_level: conf.level
+      };
+    });
+    
+    // Add AI-suggested entities to cache
+    if (validationResult?.missing_entities) {
+      for (const entity of validationResult.missing_entities) {
+        entitiesToCache.push({
+          entity_type: entity.entity_type,
+          entity_value: entity.suggested_value,
+          confidence_score: Math.round(entity.confidence * 100),
+          confidence_level: entity.confidence >= 0.8 ? "green" : entity.confidence >= 0.6 ? "yellow" : "red"
+        });
+      }
+    }
+    
+    await supabase.from("ocr_cache").upsert({
+      image_hash: imageHash,
+      ocr_raw_text: rawText,
+      ocr_processed_text: processedText,
+      ocr_confidence: Math.round(overallConfidence * 100),
+      extracted_entities: entitiesToCache,
+      template_type: templateType,
+      expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
+    }, { onConflict: 'image_hash' });
+    
+    console.log("[CACHE] ✅ Resultado salvo no cache");
     console.log("[PROCESS] Concluído com sucesso!");
 
     return new Response(
       JSON.stringify({
         success: true,
         photoRecordId,
+        fromCache: false,
         ocrSource,
         ocrConfidence: Math.round(ocrConfidence * 100),
         overallConfidence: Math.round(overallConfidence * 100),
