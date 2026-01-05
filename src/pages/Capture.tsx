@@ -1,8 +1,10 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { useOfflineQueue } from '@/hooks/useOfflineQueue';
+import { useAuth } from '@/hooks/useAuth';
+import { useCompanies, useProjects, useTemplates } from '@/hooks/useProjects';
+import { useSavePendingPhoto, useUploadPhoto } from '@/hooks/usePhotos';
 import { useGeolocation } from '@/hooks/useGeolocation';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { BottomNav } from '@/components/BottomNav';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -11,40 +13,45 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { COMPANIES, TEMPLATES } from '@/data/mockData';
-import { PhotoRecord } from '@/types/photo';
 import { Camera, MapPin, Clock, ChevronLeft, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
 }
 
 export default function Capture() {
-  const { user } = useAuth();
-  const { addToQueue } = useOfflineQueue();
-  const { getPosition, isLoading: isGettingLocation } = useGeolocation();
-  const { toast } = useToast();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
+  const isOnline = useOnlineStatus();
+  const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [companyId, setCompanyId] = useState<string>(user?.companyId || '');
+  const { data: companies = [] } = useCompanies();
+  const { data: allProjects = [] } = useProjects();
+  const { data: templates = [] } = useTemplates();
+  const { getPosition, isLoading: isGettingLocation } = useGeolocation();
+  
+  const savePending = useSavePendingPhoto();
+  const uploadPhoto = useUploadPhoto();
+
+  const [companyId, setCompanyId] = useState<string>('');
   const [projectId, setProjectId] = useState<string>('');
-  const [frontId, setFrontId] = useState<string>('');
+  const [templateId, setTemplateId] = useState<string>('');
   const [activity, setActivity] = useState<string>('');
-  const [showTimestamp, setShowTimestamp] = useState(true);
-  const [showGps, setShowGps] = useState(true);
+  const [showStamp, setShowStamp] = useState(true);
   const [isCapturing, setIsCapturing] = useState(false);
 
-  const selectedCompany = COMPANIES.find(c => c.id === companyId);
-  const selectedProject = selectedCompany?.projects.find(p => p.id === projectId);
-  const selectedFront = selectedProject?.fronts.find(f => f.id === frontId);
-  const selectedTemplate = TEMPLATES.find(t => t.id === selectedFront?.templateId);
+  const selectedCompany = companies.find(c => c.id === companyId);
+  const filteredProjects = allProjects.filter(p => p.company_id === companyId);
+  const selectedProject = filteredProjects.find(p => p.id === projectId);
+  const selectedTemplate = templates.find(t => t.id === templateId);
 
   const handleCaptureClick = () => {
-    if (!companyId || !projectId || !frontId) {
+    if (!companyId || !projectId) {
       toast({
         title: 'Campos obrigatórios',
-        description: 'Selecione empresa, obra e frente antes de capturar.',
+        description: 'Selecione empresa e projeto antes de capturar.',
         variant: 'destructive',
       });
       return;
@@ -54,65 +61,79 @@ export default function Capture() {
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !user || !profile) return;
 
     setIsCapturing(true);
 
     try {
-      // Get GPS if enabled
-      let position = null;
-      if (showGps) {
-        position = await getPosition();
-      }
+      // Get GPS
+      const position = await getPosition();
+      const deviceTimestamp = new Date();
 
-      // Convert to base64
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const imageData = reader.result as string;
+      // Convert file to blob
+      const imageBlob = new Blob([await file.arrayBuffer()], { type: 'image/jpeg' });
 
-        const photo: PhotoRecord = {
-          id: generateId(),
+      if (isOnline) {
+        // Upload directly
+        await uploadPhoto.mutateAsync({
           companyId,
+          companySlug: selectedCompany?.slug || 'unknown',
           projectId,
-          userId: user?.id || '',
-          frontId,
-          activity: activity || undefined,
-          deviceTimestamp: new Date().toISOString(),
-          latitude: position?.latitude,
-          longitude: position?.longitude,
-          accuracy: position?.accuracy,
-          filePath: `/${companyId}/COLABORADORES/${user?.name?.replace(/\s/g, '_')}/${new Date().toISOString().slice(0, 7)}/${new Date().toISOString().slice(0, 10)}/${frontId}/`,
-          imageData,
-          status: 'pending',
-          showTimestamp,
-          showGps,
-        };
-
-        addToQueue(photo);
-
-        toast({
-          title: 'Foto capturada!',
-          description: 'A foto foi salva e será sincronizada automaticamente.',
+          templateId: templateId || null,
+          activityText: activity || null,
+          deviceTimestamp,
+          latitude: position?.latitude ?? null,
+          longitude: position?.longitude ?? null,
+          accuracy: position?.accuracy ?? null,
+          imageBlob,
+          showStamp,
+          userName: profile.full_name,
+          userId: user.id,
         });
 
-        setIsCapturing(false);
-        
-        // Reset form for next capture
-        setActivity('');
-        
-        // Clear file input
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
-      };
+        toast({
+          title: 'Foto enviada!',
+          description: 'A foto foi salva no servidor com sucesso.',
+        });
+      } else {
+        // Save to IndexedDB for later
+        await savePending.mutateAsync({
+          id: generateId(),
+          companyId,
+          companyName: selectedCompany?.name || '',
+          projectId,
+          projectName: selectedProject?.name || '',
+          templateId: templateId || null,
+          templateName: selectedTemplate?.name || null,
+          activityText: activity || null,
+          deviceTimestamp: deviceTimestamp.toISOString(),
+          latitude: position?.latitude ?? null,
+          longitude: position?.longitude ?? null,
+          accuracy: position?.accuracy ?? null,
+          imageBlob,
+          showStamp,
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+        });
 
-      reader.readAsDataURL(file);
+        toast({
+          title: 'Foto salva offline!',
+          description: 'Será sincronizada quando houver conexão.',
+        });
+      }
+
+      // Reset form
+      setActivity('');
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     } catch (error) {
       toast({
         title: 'Erro na captura',
-        description: 'Não foi possível processar a foto.',
+        description: error instanceof Error ? error.message : 'Não foi possível processar a foto.',
         variant: 'destructive',
       });
+    } finally {
       setIsCapturing(false);
     }
   };
@@ -127,7 +148,9 @@ export default function Capture() {
           </Button>
           <div>
             <h1 className="text-lg font-bold">Nova Captura</h1>
-            <p className="text-xs text-muted-foreground">Configure e tire a foto</p>
+            <p className="text-xs text-muted-foreground">
+              {isOnline ? 'Online - envio direto' : 'Offline - salvar local'}
+            </p>
           </div>
         </div>
       </header>
@@ -141,13 +164,13 @@ export default function Capture() {
           <CardContent className="space-y-4">
             {/* Company */}
             <div className="space-y-2">
-              <Label>Empresa/Contrato</Label>
-              <Select value={companyId} onValueChange={(v) => { setCompanyId(v); setProjectId(''); setFrontId(''); }}>
+              <Label>Empresa</Label>
+              <Select value={companyId} onValueChange={(v) => { setCompanyId(v); setProjectId(''); }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione a empresa" />
                 </SelectTrigger>
                 <SelectContent>
-                  {COMPANIES.map(company => (
+                  {companies.map(company => (
                     <SelectItem key={company.id} value={company.id}>
                       {company.name}
                     </SelectItem>
@@ -158,13 +181,13 @@ export default function Capture() {
 
             {/* Project */}
             <div className="space-y-2">
-              <Label>Obra/Local</Label>
-              <Select value={projectId} onValueChange={(v) => { setProjectId(v); setFrontId(''); }} disabled={!companyId}>
+              <Label>Projeto/Obra</Label>
+              <Select value={projectId} onValueChange={setProjectId} disabled={!companyId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione a obra" />
+                  <SelectValue placeholder="Selecione o projeto" />
                 </SelectTrigger>
                 <SelectContent>
-                  {selectedCompany?.projects.map(project => (
+                  {filteredProjects.map(project => (
                     <SelectItem key={project.id} value={project.id}>
                       {project.name}
                     </SelectItem>
@@ -173,39 +196,29 @@ export default function Capture() {
               </Select>
             </div>
 
-            {/* Front */}
+            {/* Template */}
             <div className="space-y-2">
-              <Label>Frente</Label>
-              <Select value={frontId} onValueChange={setFrontId} disabled={!projectId}>
+              <Label>Template/Frente (opcional)</Label>
+              <Select value={templateId} onValueChange={setTemplateId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione a frente" />
+                  <SelectValue placeholder="Automático" />
                 </SelectTrigger>
                 <SelectContent>
-                  {selectedProject?.fronts.map(front => (
-                    <SelectItem key={front.id} value={front.id}>
-                      {front.name}
+                  <SelectItem value="">Automático</SelectItem>
+                  {templates.map(template => (
+                    <SelectItem key={template.id} value={template.id}>
+                      {template.icon} {template.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Template indicator */}
-            {selectedTemplate && (
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
-                <span className="text-xl">{selectedTemplate.icon}</span>
-                <div>
-                  <p className="text-sm font-medium">{selectedTemplate.name}</p>
-                  <p className="text-xs text-muted-foreground">{selectedTemplate.description}</p>
-                </div>
-              </div>
-            )}
-
             {/* Activity */}
             <div className="space-y-2">
               <Label>Atividade (opcional)</Label>
               <Input
-                placeholder="Descreva brevemente a atividade..."
+                placeholder="Descreva a atividade..."
                 value={activity}
                 onChange={(e) => setActivity(e.target.value)}
               />
@@ -225,24 +238,11 @@ export default function Capture() {
                   <Clock className="h-4 w-4 text-primary" />
                 </div>
                 <div>
-                  <Label className="cursor-pointer">Carimbo de data/hora</Label>
-                  <p className="text-xs text-muted-foreground">Mostra timestamp na foto</p>
+                  <Label className="cursor-pointer">Carimbo na foto</Label>
+                  <p className="text-xs text-muted-foreground">Timestamp, GPS, colaborador</p>
                 </div>
               </div>
-              <Switch checked={showTimestamp} onCheckedChange={setShowTimestamp} />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <MapPin className="h-4 w-4 text-primary" />
-                </div>
-                <div>
-                  <Label className="cursor-pointer">Localização GPS</Label>
-                  <p className="text-xs text-muted-foreground">Registra coordenadas</p>
-                </div>
-              </div>
-              <Switch checked={showGps} onCheckedChange={setShowGps} />
+              <Switch checked={showStamp} onCheckedChange={setShowStamp} />
             </div>
           </CardContent>
         </Card>
@@ -253,9 +253,9 @@ export default function Capture() {
             size="lg"
             className="w-full h-16 text-lg capture-btn"
             onClick={handleCaptureClick}
-            disabled={isCapturing}
+            disabled={isCapturing || uploadPhoto.isPending}
           >
-            {isCapturing ? (
+            {isCapturing || uploadPhoto.isPending ? (
               <>
                 <Loader2 className="mr-2 h-6 w-6 animate-spin" />
                 Processando...

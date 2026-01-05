@@ -1,20 +1,17 @@
-import { Wifi, WifiOff, Cloud, CloudOff, RefreshCw } from 'lucide-react';
+import { Wifi, WifiOff, Cloud, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { SyncStatus } from '@/types/photo';
 
 interface SyncIndicatorProps {
   isOnline: boolean;
   isSyncing: boolean;
-  syncStatus: SyncStatus;
+  pendingCount: number;
   onSync: () => void;
 }
 
-export function SyncIndicator({ isOnline, isSyncing, syncStatus, onSync }: SyncIndicatorProps) {
-  const hasPending = syncStatus.pending > 0 || syncStatus.error > 0;
-
+export function SyncIndicator({ isOnline, isSyncing, pendingCount, onSync }: SyncIndicatorProps) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-2">
       {/* Online status */}
       <div
         className={cn(
@@ -29,19 +26,15 @@ export function SyncIndicator({ isOnline, isSyncing, syncStatus, onSync }: SyncI
       </div>
 
       {/* Pending count */}
-      {hasPending && (
+      {pendingCount > 0 && (
         <div className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium bg-warning/10 text-warning">
-          {syncStatus.error > 0 ? (
-            <CloudOff className="h-3 w-3" />
-          ) : (
-            <Cloud className="h-3 w-3" />
-          )}
-          {syncStatus.pending + syncStatus.error} pendentes
+          <Cloud className="h-3 w-3" />
+          {pendingCount}
         </div>
       )}
 
       {/* Sync button */}
-      {isOnline && hasPending && (
+      {isOnline && pendingCount > 0 && (
         <Button
           size="sm"
           variant="ghost"
