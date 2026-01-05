@@ -1,0 +1,19 @@
+{
+  "name": "ObraPhoto Mobile",
+  "short_name": "ObraPhoto",
+  "description": "Registro Técnico de Campo - Capture, organize e sincronize fotos de obras",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f7fa",
+  "theme_color": "#f97316",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64",
+      "type": "image/x-icon"
+    }
+  ],
+  "categories": ["productivity", "utilities"],
+  "lang": "pt-BR"
+}
