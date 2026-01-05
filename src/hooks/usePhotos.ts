@@ -118,17 +118,74 @@ export function useUploadPhoto() {
           file_url: urlData.publicUrl,
           file_path: filePath,
           show_stamp: params.showStamp,
+          ocr_status: 'pending',
         })
         .select()
         .single();
 
       if (error) throw error;
+      
+      // Trigger OCR processing automatically (fire and forget)
+      triggerOCRProcessing(data.id, urlData.publicUrl, params.templateId);
+      
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['photo_records'] });
     },
   });
+}
+
+// Fire-and-forget OCR processing
+async function triggerOCRProcessing(photoRecordId: string, imageUrl: string, templateId: string | null) {
+  try {
+    console.log('[OCR] Iniciando processamento automático para:', photoRecordId);
+    
+    // Map template_id to template_type
+    let templateType = 'civil_geral';
+    if (templateId) {
+      const { data: template } = await supabase
+        .from('templates')
+        .select('name')
+        .eq('id', templateId)
+        .single();
+      
+      if (template) {
+        // Map template name to type
+        const nameToType: Record<string, string> = {
+          'Civil Geral': 'civil_geral',
+          'Pavimentação': 'pavimentacao',
+          'Drenagem': 'drenagem',
+          'Terraplenagem': 'terraplenagem',
+          'Concreto/Estruturas': 'concreto',
+          'Elétrica/Iluminação': 'eletrica',
+          'Sinalização': 'sinalizacao',
+        };
+        templateType = nameToType[template.name] || 'civil_geral';
+      }
+    }
+    
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-photo`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ photoRecordId, imageUrl, templateType }),
+      }
+    );
+
+    if (!response.ok) {
+      console.error('[OCR] Erro no processamento:', await response.text());
+    } else {
+      const result = await response.json();
+      console.log('[OCR] Processamento concluído:', result);
+    }
+  } catch (error) {
+    console.error('[OCR] Erro ao disparar processamento:', error);
+  }
 }
 
 export function useSyncPendingPhotos() {
@@ -162,6 +219,7 @@ export function useSyncPendingPhotos() {
             .eq('id', userId)
             .single();
 
+          // Upload triggers OCR automatically now
           await uploadPhoto.mutateAsync({
             companyId: photo.companyId,
             companySlug: company.slug,
