@@ -337,6 +337,195 @@ export type Database = {
           },
         ]
       }
+      rdo_equipment: {
+        Row: {
+          created_at: string
+          equipment_name: string
+          id: string
+          is_contracted: boolean | null
+          quantity: number
+          rdo_id: string
+        }
+        Insert: {
+          created_at?: string
+          equipment_name: string
+          id?: string
+          is_contracted?: boolean | null
+          quantity?: number
+          rdo_id: string
+        }
+        Update: {
+          created_at?: string
+          equipment_name?: string
+          id?: string
+          is_contracted?: boolean | null
+          quantity?: number
+          rdo_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rdo_equipment_rdo_id_fkey"
+            columns: ["rdo_id"]
+            isOneToOne: false
+            referencedRelation: "rdo_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rdo_occurrences: {
+        Row: {
+          complement: string | null
+          created_at: string
+          description: string
+          end_time: string | null
+          id: string
+          impact_hours: number | null
+          rdo_id: string
+          start_time: string | null
+        }
+        Insert: {
+          complement?: string | null
+          created_at?: string
+          description: string
+          end_time?: string | null
+          id?: string
+          impact_hours?: number | null
+          rdo_id: string
+          start_time?: string | null
+        }
+        Update: {
+          complement?: string | null
+          created_at?: string
+          description?: string
+          end_time?: string | null
+          id?: string
+          impact_hours?: number | null
+          rdo_id?: string
+          start_time?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rdo_occurrences_rdo_id_fkey"
+            columns: ["rdo_id"]
+            isOneToOne: false
+            referencedRelation: "rdo_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rdo_records: {
+        Row: {
+          company_id: string
+          condition_afternoon: string | null
+          condition_morning: string | null
+          condition_night: string | null
+          contract_number: string | null
+          created_at: string
+          date: string
+          id: string
+          is_work_day: boolean
+          observations: string | null
+          project_id: string
+          status: string
+          updated_at: string
+          user_id: string
+          weather_afternoon: string | null
+          weather_morning: string | null
+          weather_night: string | null
+          work_end_time: string | null
+          work_start_time: string | null
+        }
+        Insert: {
+          company_id: string
+          condition_afternoon?: string | null
+          condition_morning?: string | null
+          condition_night?: string | null
+          contract_number?: string | null
+          created_at?: string
+          date: string
+          id?: string
+          is_work_day?: boolean
+          observations?: string | null
+          project_id: string
+          status?: string
+          updated_at?: string
+          user_id: string
+          weather_afternoon?: string | null
+          weather_morning?: string | null
+          weather_night?: string | null
+          work_end_time?: string | null
+          work_start_time?: string | null
+        }
+        Update: {
+          company_id?: string
+          condition_afternoon?: string | null
+          condition_morning?: string | null
+          condition_night?: string | null
+          contract_number?: string | null
+          created_at?: string
+          date?: string
+          id?: string
+          is_work_day?: boolean
+          observations?: string | null
+          project_id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+          weather_afternoon?: string | null
+          weather_morning?: string | null
+          weather_night?: string | null
+          work_end_time?: string | null
+          work_start_time?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rdo_records_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rdo_records_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rdo_workers: {
+        Row: {
+          created_at: string
+          id: string
+          quantity: number
+          rdo_id: string
+          role_name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          quantity?: number
+          rdo_id: string
+          role_name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          quantity?: number
+          rdo_id?: string
+          role_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rdo_workers_rdo_id_fkey"
+            columns: ["rdo_id"]
+            isOneToOne: false
+            referencedRelation: "rdo_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       template_configs: {
         Row: {
           config_key: string
