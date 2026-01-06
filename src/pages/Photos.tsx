@@ -46,7 +46,7 @@ export default function Photos() {
             </Button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-2">
             {photos.map(photo => (
               <PhotoCard key={photo.id} photo={photo} />
             ))}
