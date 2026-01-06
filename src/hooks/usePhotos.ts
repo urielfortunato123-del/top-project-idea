@@ -11,8 +11,11 @@ import {
 
 export interface PhotoRecord {
   id: string;
-  company_id: string;
-  project_id: string;
+  company_id: string | null;
+  company_name: string | null;
+  project_id: string | null;
+  project_name: string | null;
+  frente_servico: string | null;
   user_id: string;
   template_id: string | null;
   activity_text: string | null;

@@ -7,11 +7,13 @@ export function BottomNav() {
   const location = useLocation();
   const { isAdmin } = useAuth();
 
+  // Colaboradores: Início, Captura, Fotos, Pendentes, Perfil
+  // Admin: adiciona Mapa e Admin
   const navItems = [
     { to: '/dashboard', icon: Home, label: 'Início' },
     { to: '/capture', icon: Camera, label: 'Capturar' },
     { to: '/photos', icon: Images, label: 'Fotos' },
-    { to: '/photo-map', icon: MapPin, label: 'Mapa' },
+    ...(isAdmin ? [{ to: '/photo-map', icon: MapPin, label: 'Mapa' }] : []),
     ...(isAdmin ? [{ to: '/admin', icon: Settings, label: 'Admin' }] : []),
     { to: '/profile', icon: User, label: 'Perfil' },
   ];

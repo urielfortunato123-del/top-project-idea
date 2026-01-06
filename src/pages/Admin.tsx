@@ -11,12 +11,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { ChevronLeft, Building2, FolderOpen, FileText, Plus, Loader2 } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
+import { ChevronLeft, Building2, FolderOpen, FileText, Plus, Loader2, Users, Trash2 } from 'lucide-react';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
+
+interface UserWithRole {
+  id: string;
+  email: string;
+  full_name: string;
+  role: 'admin' | 'colaborador';
+  created_at: string;
+}
 
 export default function Admin() {
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -40,10 +47,42 @@ export default function Admin() {
   const [templateIcon, setTemplateIcon] = useState('🏗️');
   const [templateDescription, setTemplateDescription] = useState('');
 
-  if (!isAdmin) {
-    navigate('/dashboard');
-    return null;
-  }
+  // User form
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserName, setNewUserName] = useState('');
+
+  // Fetch users with roles
+  const { data: users = [], isLoading: isLoadingUsers } = useQuery({
+    queryKey: ['admin_users'],
+    queryFn: async () => {
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, created_at');
+      
+      if (profilesError) throw profilesError;
+
+      const { data: roles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id, role');
+      
+      if (rolesError) throw rolesError;
+
+      // Get user emails from auth (this won't work directly, we'll show profile info)
+      const usersWithRoles: UserWithRole[] = profiles.map(profile => {
+        const userRole = roles.find(r => r.user_id === profile.id);
+        return {
+          id: profile.id,
+          email: '', // Email not accessible from profiles
+          full_name: profile.full_name,
+          role: (userRole?.role as 'admin' | 'colaborador') || 'colaborador',
+          created_at: profile.created_at,
+        };
+      });
+
+      return usersWithRoles;
+    },
+  });
 
   const handleAddCompany = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -133,6 +172,64 @@ export default function Admin() {
     }
   };
 
+  const handleAddUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      // Create user via Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: newUserEmail,
+        password: newUserPassword,
+        options: {
+          data: { full_name: newUserName },
+          emailRedirectTo: `${window.location.origin}/`,
+        }
+      });
+
+      if (authError) throw authError;
+
+      toast({ 
+        title: 'Colaborador criado com sucesso!',
+        description: `Login: ${newUserEmail}`,
+      });
+      setNewUserEmail('');
+      setNewUserPassword('');
+      setNewUserName('');
+      queryClient.invalidateQueries({ queryKey: ['admin_users'] });
+    } catch (error) {
+      toast({
+        title: 'Erro ao criar colaborador',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleToggleRole = async (userId: string, currentRole: 'admin' | 'colaborador') => {
+    const newRole = currentRole === 'admin' ? 'colaborador' : 'admin';
+    
+    try {
+      const { error } = await supabase
+        .from('user_roles')
+        .update({ role: newRole })
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      toast({ title: `Usuário alterado para ${newRole}` });
+      queryClient.invalidateQueries({ queryKey: ['admin_users'] });
+    } catch (error) {
+      toast({
+        title: 'Erro ao alterar role',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background pb-24">
       {/* Header */}
@@ -149,8 +246,12 @@ export default function Admin() {
       </header>
 
       <main className="px-4 py-6">
-        <Tabs defaultValue="companies">
-          <TabsList className="w-full grid grid-cols-3 mb-6">
+        <Tabs defaultValue="users">
+          <TabsList className="w-full grid grid-cols-4 mb-6">
+            <TabsTrigger value="users" className="text-xs">
+              <Users className="h-4 w-4 mr-1" />
+              Usuários
+            </TabsTrigger>
             <TabsTrigger value="companies" className="text-xs">
               <Building2 className="h-4 w-4 mr-1" />
               Empresas
@@ -164,6 +265,84 @@ export default function Admin() {
               Templates
             </TabsTrigger>
           </TabsList>
+
+          {/* Users Tab */}
+          <TabsContent value="users" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Novo Colaborador</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleAddUser} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Nome Completo</Label>
+                    <Input
+                      value={newUserName}
+                      onChange={(e) => setNewUserName(e.target.value)}
+                      placeholder="Nome do colaborador"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>E-mail (login)</Label>
+                    <Input
+                      type="email"
+                      value={newUserEmail}
+                      onChange={(e) => setNewUserEmail(e.target.value)}
+                      placeholder="email@exemplo.com"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Senha</Label>
+                    <Input
+                      type="password"
+                      value={newUserPassword}
+                      onChange={(e) => setNewUserPassword(e.target.value)}
+                      placeholder="Mínimo 6 caracteres"
+                      minLength={6}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" disabled={isLoading}>
+                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+                    Criar Colaborador
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Usuários Cadastrados ({users.length})</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {isLoadingUsers ? (
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                ) : (
+                  users.map(u => (
+                    <div key={u.id} className="p-3 rounded-lg bg-muted/50 flex justify-between items-center">
+                      <div>
+                        <p className="font-medium">{u.full_name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {u.role === 'admin' ? '👑 Administrador' : '👷 Colaborador'}
+                        </p>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleToggleRole(u.id, u.role)}
+                      >
+                        {u.role === 'admin' ? 'Tornar Colaborador' : 'Tornar Admin'}
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* Companies Tab */}
           <TabsContent value="companies" className="space-y-4">

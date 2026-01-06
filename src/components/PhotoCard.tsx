@@ -23,8 +23,12 @@ export function PhotoCard({ photo, isPending = false }: PhotoCardProps) {
 
   const status = isPhotoRecord ? photo.status as any : photo.status;
   const timestamp = isPhotoRecord ? photo.device_timestamp : photo.deviceTimestamp;
-  const projectName = isPhotoRecord ? photo.projects?.name : photo.projectName;
-  const companyName = isPhotoRecord ? photo.companies?.name : photo.companyName;
+  const projectName = isPhotoRecord 
+    ? (photo.project_name || photo.projects?.name) 
+    : photo.projectName;
+  const companyName = isPhotoRecord 
+    ? (photo.company_name || photo.companies?.name) 
+    : photo.companyName;
   const templateName = isPhotoRecord ? photo.templates?.name : photo.templateName;
   const latitude = isPhotoRecord ? photo.latitude : photo.latitude;
   const longitude = isPhotoRecord ? photo.longitude : photo.longitude;
