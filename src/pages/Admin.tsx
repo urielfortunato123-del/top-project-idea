@@ -177,19 +177,18 @@ export default function Admin() {
     setIsLoading(true);
 
     try {
-      // Create user via Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: newUserEmail,
-        password: newUserPassword,
-        options: {
-          data: { full_name: newUserName },
-          emailRedirectTo: `${window.location.origin}/`,
-        }
+      const { data, error } = await supabase.functions.invoke('admin-create-user', {
+        body: {
+          email: newUserEmail,
+          password: newUserPassword,
+          full_name: newUserName,
+        },
       });
 
-      if (authError) throw authError;
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || 'Não foi possível criar o colaborador');
 
-      toast({ 
+      toast({
         title: 'Colaborador criado com sucesso!',
         description: `Login: ${newUserEmail}`,
       });
