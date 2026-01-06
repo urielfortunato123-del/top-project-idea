@@ -35,23 +35,22 @@ export default function Capture() {
   const savePending = useSavePendingPhoto();
   const uploadPhoto = useUploadPhoto();
 
-  const [companyId, setCompanyId] = useState<string>('');
+  const [companyName, setCompanyName] = useState<string>('');
   const [projectId, setProjectId] = useState<string>('');
   const [templateId, setTemplateId] = useState<string>('');
   const [activity, setActivity] = useState<string>('');
   const [showStamp, setShowStamp] = useState(true);
   const [isCapturing, setIsCapturing] = useState(false);
 
-  const selectedCompany = companies.find(c => c.id === companyId);
-  const filteredProjects = allProjects.filter(p => p.company_id === companyId);
+  const filteredProjects = allProjects;
   const selectedProject = filteredProjects.find(p => p.id === projectId);
   const selectedTemplate = templates.find(t => t.id === templateId);
 
   const handleCaptureClick = () => {
-    if (!companyId || !projectId) {
+    if (!companyName.trim() || !projectId) {
       toast({
         title: 'Campos obrigatórios',
-        description: 'Selecione empresa e projeto antes de capturar.',
+        description: 'Preencha empresa e selecione projeto antes de capturar.',
         variant: 'destructive',
       });
       return;
@@ -82,7 +81,7 @@ export default function Capture() {
             longitude: position?.longitude,
             userName: profile.full_name,
             projectName: selectedProject?.name,
-            companyName: selectedCompany?.name,
+            companyName: companyName.trim(),
           });
         } catch (stampError) {
           console.error('Error applying stamp:', stampError);
@@ -93,8 +92,8 @@ export default function Capture() {
       if (isOnline) {
         // Upload directly
         await uploadPhoto.mutateAsync({
-          companyId,
-          companySlug: selectedCompany?.slug || 'unknown',
+          companyId: selectedProject?.company_id || '',
+          companySlug: 'manual',
           projectId,
           templateId: templateId || null,
           activityText: activity || null,
@@ -116,8 +115,8 @@ export default function Capture() {
         // Save to IndexedDB for later
         await savePending.mutateAsync({
           id: generateId(),
-          companyId,
-          companyName: selectedCompany?.name || '',
+          companyId: selectedProject?.company_id || '',
+          companyName: companyName.trim(),
           projectId,
           projectName: selectedProject?.name || '',
           templateId: templateId || null,
@@ -182,24 +181,17 @@ export default function Capture() {
             {/* Company */}
             <div className="space-y-2">
               <Label>Empresa</Label>
-              <Select value={companyId} onValueChange={(v) => { setCompanyId(v); setProjectId(''); }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a empresa" />
-                </SelectTrigger>
-                <SelectContent>
-                  {companies.map(company => (
-                    <SelectItem key={company.id} value={company.id}>
-                      {company.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Input
+                placeholder="Digite o nome da empresa..."
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+              />
             </div>
 
             {/* Project */}
             <div className="space-y-2">
               <Label>Projeto/Obra</Label>
-              <Select value={projectId} onValueChange={setProjectId} disabled={!companyId}>
+              <Select value={projectId} onValueChange={setProjectId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o projeto" />
                 </SelectTrigger>
