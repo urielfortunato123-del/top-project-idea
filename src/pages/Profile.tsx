@@ -5,13 +5,14 @@ import { BottomNav } from '@/components/BottomNav';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { toast } from 'sonner';
 import { 
   User, 
   LogOut, 
   Camera, 
   HardHat,
   Shield,
-  ChevronRight
+  RefreshCw
 } from 'lucide-react';
 
 export default function Profile() {
@@ -68,6 +69,34 @@ export default function Profile() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Update App Button */}
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={() => {
+            toast.info('Verificando atualizações...');
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistration().then((registration) => {
+                if (registration) {
+                  registration.update().then(() => {
+                    toast.success('Aplicativo atualizado!');
+                    setTimeout(() => window.location.reload(), 500);
+                  }).catch(() => {
+                    window.location.reload();
+                  });
+                } else {
+                  window.location.reload();
+                }
+              });
+            } else {
+              window.location.reload();
+            }
+          }}
+        >
+          <RefreshCw className="mr-2 h-4 w-4" />
+          Atualizar Aplicativo
+        </Button>
 
         {/* Logout */}
         <Button
