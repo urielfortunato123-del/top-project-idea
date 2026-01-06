@@ -7,8 +7,6 @@ export function BottomNav() {
   const location = useLocation();
   const { isAdmin } = useAuth();
 
-  // Colaboradores: Início, Captura, Fotos, Pendentes, Perfil
-  // Admin: adiciona Mapa e Admin
   const navItems = [
     { to: '/dashboard', icon: Home, label: 'Início' },
     { to: '/capture', icon: Camera, label: 'Capturar' },
@@ -20,9 +18,9 @@ export function BottomNav() {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border pwa-safe-area">
-      <div className="flex items-center justify-around h-16">
-        {navItems.map((item) => {
+    <nav className="glass-nav pwa-safe-area">
+      <div className="flex items-center justify-around h-18 py-2">
+        {navItems.map((item, index) => {
           const isActive = location.pathname === item.to;
           const Icon = item.icon;
 
@@ -31,26 +29,36 @@ export function BottomNav() {
               key={item.to}
               to={item.to}
               className={cn(
-                'flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-all duration-200',
+                'flex flex-col items-center justify-center gap-1 px-2 py-1.5 rounded-2xl transition-all duration-300',
                 isActive
                   ? 'text-primary'
                   : 'text-muted-foreground hover:text-foreground'
               )}
+              style={{
+                animationDelay: `${index * 50}ms`,
+              }}
             >
               <div
                 className={cn(
-                  'p-2 rounded-xl transition-all duration-200',
-                  isActive && 'bg-primary/10'
+                  'p-2.5 rounded-2xl transition-all duration-300',
+                  isActive 
+                    ? 'bg-primary/20 shadow-glow scale-110' 
+                    : 'hover:bg-secondary/50'
                 )}
               >
                 <Icon
                   className={cn(
-                    'h-5 w-5 transition-transform duration-200',
-                    isActive && 'scale-110'
+                    'h-5 w-5 transition-all duration-300',
+                    isActive && 'drop-shadow-[0_0_8px_hsl(217,91%,60%)]'
                   )}
                 />
               </div>
-              <span className="text-[10px] font-medium">{item.label}</span>
+              <span className={cn(
+                'text-[10px] font-medium transition-all duration-300',
+                isActive && 'text-gradient font-semibold'
+              )}>
+                {item.label}
+              </span>
             </NavLink>
           );
         })}

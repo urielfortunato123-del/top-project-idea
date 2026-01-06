@@ -11,9 +11,8 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Camera, Clock, ChevronLeft, Loader2 } from 'lucide-react';
+import { Camera, Clock, ChevronLeft, Loader2, Wifi, WifiOff, MapPin, Building2, FolderKanban, Wrench, FileText } from 'lucide-react';
 import { drawStampOnImage } from '@/components/PhotoStamp';
 
 function generateId(): string {
@@ -81,16 +80,13 @@ export default function Capture() {
     const selectedTemplateId = templateId || null;
 
     try {
-      // Get GPS in parallel with image processing
       const [position, arrayBuffer] = await Promise.all([
         getPosition().catch(() => null),
         file.arrayBuffer()
       ]);
 
-      // Use file directly as blob (faster than re-creating)
       let imageBlob: Blob = file;
 
-      // Apply stamp if enabled
       if (showStamp) {
         try {
           imageBlob = await drawStampOnImage(file, {
@@ -156,7 +152,6 @@ export default function Capture() {
         });
       }
 
-      // Reset entire form after success
       resetForm();
     } catch (error) {
       toast({
@@ -164,7 +159,6 @@ export default function Capture() {
         description: error instanceof Error ? error.message : 'Não foi possível processar a foto.',
         variant: 'destructive',
       });
-      // Only reset file input on error
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -174,127 +168,157 @@ export default function Capture() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen pb-24">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-card/80 backdrop-blur-md border-b border-border">
-        <div className="px-4 py-4 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
-            <ChevronLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-lg font-bold">Nova Captura</h1>
-            <p className="text-xs text-muted-foreground">
-              {isOnline ? 'Online - envio direto' : 'Offline - salvar local'}
-            </p>
+      <header className="glass-header">
+        <div className="px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="rounded-xl hover:bg-secondary/50"
+              onClick={() => navigate('/dashboard')}
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
+            <div className="animate-fade-in">
+              <h1 className="text-lg font-display font-bold">Nova Captura</h1>
+              <div className="flex items-center gap-1.5 text-xs">
+                {isOnline ? (
+                  <>
+                    <Wifi className="h-3 w-3 text-success" />
+                    <span className="text-success">Online - envio direto</span>
+                  </>
+                ) : (
+                  <>
+                    <WifiOff className="h-3 w-3 text-warning" />
+                    <span className="text-warning">Offline - salvar local</span>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </header>
 
-      <main className="px-4 py-6 space-y-6">
-        {/* Selection Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Local da Captura</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Company */}
-            <div className="space-y-2">
-              <Label>Empresa</Label>
-              <Input
-                placeholder="Digite o nome da empresa..."
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
-              />
+      <main className="px-4 py-6 space-y-5">
+        {/* Location Card */}
+        <div className="glass-card rounded-2xl p-5 space-y-4 animate-slide-up">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-primary/20">
+              <MapPin className="h-4 w-4 text-primary" />
             </div>
+            <h2 className="font-display font-semibold">Local da Captura</h2>
+          </div>
+          
+          {/* Company */}
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground flex items-center gap-2">
+              <Building2 className="h-3.5 w-3.5" />
+              Empresa
+            </Label>
+            <Input
+              placeholder="Digite o nome da empresa..."
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+              className="bg-secondary/50 border-border/50 rounded-xl focus:border-primary/50"
+            />
+          </div>
 
-            {/* Project */}
-            <div className="space-y-2">
-              <Label>Projeto/Obra</Label>
-              <Input
-                placeholder="Digite o nome do projeto..."
-                value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
-              />
-            </div>
+          {/* Project */}
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground flex items-center gap-2">
+              <FolderKanban className="h-3.5 w-3.5" />
+              Projeto/Obra
+            </Label>
+            <Input
+              placeholder="Digite o nome do projeto..."
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value)}
+              className="bg-secondary/50 border-border/50 rounded-xl focus:border-primary/50"
+            />
+          </div>
 
-            {/* Frente de Serviço */}
-            <div className="space-y-2">
-              <Label>Frente de Serviço</Label>
-              <Input
-                placeholder="Ex: Fundação, Concretagem, Alvenaria..."
-                value={frenteServico}
-                onChange={(e) => setFrenteServico(e.target.value)}
-              />
-            </div>
+          {/* Frente de Serviço */}
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground flex items-center gap-2">
+              <Wrench className="h-3.5 w-3.5" />
+              Frente de Serviço
+            </Label>
+            <Input
+              placeholder="Ex: Fundação, Concretagem, Alvenaria..."
+              value={frenteServico}
+              onChange={(e) => setFrenteServico(e.target.value)}
+              className="bg-secondary/50 border-border/50 rounded-xl focus:border-primary/50"
+            />
+          </div>
 
-            {/* Template */}
-            <div className="space-y-2">
-              <Label>Template/Frente (opcional)</Label>
-              <Select value={templateId} onValueChange={(v) => setTemplateId(v === "auto" ? "" : v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Automático" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="auto">Automático</SelectItem>
-                  {templates.filter(t => t.id && t.id.trim() !== "").map(template => (
-                    <SelectItem key={template.id} value={template.id}>
-                      {template.icon} {template.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          {/* Template */}
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground flex items-center gap-2">
+              <FileText className="h-3.5 w-3.5" />
+              Template (opcional)
+            </Label>
+            <Select value={templateId} onValueChange={(v) => setTemplateId(v === "auto" ? "" : v)}>
+              <SelectTrigger className="bg-secondary/50 border-border/50 rounded-xl">
+                <SelectValue placeholder="Automático" />
+              </SelectTrigger>
+              <SelectContent className="glass-card border-border/50">
+                <SelectItem value="auto">Automático</SelectItem>
+                {templates.filter(t => t.id && t.id.trim() !== "").map(template => (
+                  <SelectItem key={template.id} value={template.id}>
+                    {template.icon} {template.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-            {/* Activity */}
-            <div className="space-y-2">
-              <Label>Atividade (opcional)</Label>
-              <Input
-                placeholder="Descreva a atividade..."
-                value={activity}
-                onChange={(e) => setActivity(e.target.value)}
-              />
-            </div>
-          </CardContent>
-        </Card>
+          {/* Activity */}
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Atividade (opcional)</Label>
+            <Input
+              placeholder="Descreva a atividade..."
+              value={activity}
+              onChange={(e) => setActivity(e.target.value)}
+              className="bg-secondary/50 border-border/50 rounded-xl focus:border-primary/50"
+            />
+          </div>
+        </div>
 
         {/* Options Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Opções</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <Clock className="h-4 w-4 text-primary" />
-                </div>
-                <div>
-                  <Label className="cursor-pointer">Carimbo na foto</Label>
-                  <p className="text-xs text-muted-foreground">Timestamp, GPS, colaborador</p>
-                </div>
+        <div className="glass-card rounded-2xl p-5 animate-slide-up" style={{ animationDelay: '100ms' }}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary to-accent">
+                <Clock className="h-4 w-4 text-white" />
               </div>
-              <Switch checked={showStamp} onCheckedChange={setShowStamp} />
+              <div>
+                <Label className="cursor-pointer font-display font-medium">Carimbo na foto</Label>
+                <p className="text-xs text-muted-foreground">Timestamp, GPS, colaborador</p>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+            <Switch checked={showStamp} onCheckedChange={setShowStamp} />
+          </div>
+        </div>
 
         {/* Capture Button */}
-        <div className="fixed bottom-24 left-4 right-4">
+        <div className="fixed bottom-24 left-4 right-4 animate-slide-up" style={{ animationDelay: '200ms' }}>
           <Button
             size="lg"
-            className="w-full h-16 text-lg capture-btn"
+            className="w-full h-16 text-lg capture-btn rounded-2xl border-0"
             onClick={handleCaptureClick}
             disabled={isCapturing || uploadPhoto.isPending}
           >
             {isCapturing || uploadPhoto.isPending ? (
               <>
                 <Loader2 className="mr-2 h-6 w-6 animate-spin" />
-                Processando...
+                <span className="font-display">Processando...</span>
               </>
             ) : (
               <>
                 <Camera className="mr-2 h-6 w-6" />
-                Capturar Foto
+                <span className="font-display font-semibold">Capturar Foto</span>
               </>
             )}
           </Button>
