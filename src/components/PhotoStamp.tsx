@@ -65,89 +65,95 @@ export async function drawStampOnImage(
     const url = URL.createObjectURL(imageBlob);
     
     img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      
-      if (!ctx) {
+      try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        if (!ctx) {
+          URL.revokeObjectURL(url);
+          reject(new Error('Could not get canvas context'));
+          return;
+        }
+        
+        canvas.width = img.width;
+        canvas.height = img.height;
+        
+        // Draw original image
+        ctx.drawImage(img, 0, 0);
+        
+        // Prepare stamp text
+        const date = stampData.timestamp;
+        const formattedDate = format(date, "dd/MM/yyyy HH:mm:ss", { locale: ptBR });
+        
+        const hasCoords = stampData.latitude != null && stampData.longitude != null;
+        const coordsText = hasCoords 
+          ? `LAT: ${stampData.latitude!.toFixed(6)} | LON: ${stampData.longitude!.toFixed(6)}`
+          : 'GPS indisponível';
+        
+        const lines: string[] = [];
+        
+        // Add company and project first (more prominent)
+        if (stampData.companyName) lines.push(`🏢 ${stampData.companyName}`);
+        if (stampData.projectName) lines.push(`📁 ${stampData.projectName}`);
+        if (stampData.userName) lines.push(`👤 ${stampData.userName}`);
+        lines.push(`📅 ${formattedDate}`);
+        lines.push(`📍 ${coordsText}`);
+        
+        // Calculate font size based on image size (responsive)
+        const fontSize = Math.max(Math.floor(img.width / 30), 16);
+        const lineHeight = fontSize * 1.4;
+        const padding = fontSize;
+        
+        ctx.font = `bold ${fontSize}px Arial, sans-serif`;
+        
+        // Calculate text width for background
+        const maxWidth = Math.max(...lines.map(line => ctx.measureText(line).width));
+        const boxWidth = maxWidth + padding * 2;
+        const boxHeight = lines.length * lineHeight + padding * 1.5;
+        
+        // Position in bottom-left corner
+        const boxX = padding / 2;
+        const boxY = img.height - boxHeight - padding / 2;
+        
+        // Draw semi-transparent background
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.beginPath();
+        ctx.roundRect(boxX, boxY, boxWidth, boxHeight, fontSize * 0.3);
+        ctx.fill();
+        
+        // Draw text - bright yellow/orange color for visibility
+        ctx.fillStyle = '#FFD700';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        
+        // Add text shadow for better visibility
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetX = 2;
+        ctx.shadowOffsetY = 2;
+        
+        lines.forEach((line, index) => {
+          const y = boxY + padding * 0.75 + (index * lineHeight);
+          ctx.fillText(line, boxX + padding, y);
+        });
+        
         URL.revokeObjectURL(url);
-        reject(new Error('Could not get canvas context'));
-        return;
+        
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('Could not create blob from canvas'));
+            }
+          },
+          'image/jpeg',
+          0.92
+        );
+      } catch (err) {
+        URL.revokeObjectURL(url);
+        reject(err);
       }
-      
-      canvas.width = img.width;
-      canvas.height = img.height;
-      
-      // Draw original image
-      ctx.drawImage(img, 0, 0);
-      
-      // Prepare stamp text
-      const date = stampData.timestamp;
-      const formattedDate = format(date, "dd/MM/yyyy HH:mm:ss", { locale: ptBR });
-      
-      const hasCoords = stampData.latitude != null && stampData.longitude != null;
-      const coordsText = hasCoords 
-        ? `${stampData.latitude!.toFixed(6)}, ${stampData.longitude!.toFixed(6)}`
-        : 'GPS indisponível';
-      
-      const lines: string[] = [
-        formattedDate,
-        coordsText,
-      ];
-      
-      if (stampData.userName) lines.push(stampData.userName);
-      if (stampData.projectName) lines.push(stampData.projectName);
-      if (stampData.companyName) lines.push(stampData.companyName);
-      
-      // Calculate font size based on image size (responsive)
-      const fontSize = Math.max(Math.floor(img.width / 40), 14);
-      const lineHeight = fontSize * 1.3;
-      const padding = fontSize * 0.8;
-      
-      ctx.font = `bold ${fontSize}px monospace`;
-      
-      // Calculate text width for background
-      const maxWidth = Math.max(...lines.map(line => ctx.measureText(line).width));
-      const boxWidth = maxWidth + padding * 2;
-      const boxHeight = lines.length * lineHeight + padding * 2;
-      
-      // Position in bottom-right corner
-      const boxX = img.width - boxWidth - padding;
-      const boxY = img.height - boxHeight - padding;
-      
-      // Draw semi-transparent background
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-      ctx.roundRect(boxX, boxY, boxWidth, boxHeight, fontSize * 0.3);
-      ctx.fill();
-      
-      // Draw text - dark yellow color
-      ctx.fillStyle = '#D4A017';
-      ctx.textAlign = 'right';
-      ctx.textBaseline = 'top';
-      
-      // Add text shadow
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-      ctx.shadowBlur = 3;
-      ctx.shadowOffsetX = 1;
-      ctx.shadowOffsetY = 1;
-      
-      lines.forEach((line, index) => {
-        const y = boxY + padding + (index * lineHeight);
-        ctx.fillText(line, img.width - padding * 2, y);
-      });
-      
-      URL.revokeObjectURL(url);
-      
-      canvas.toBlob(
-        (blob) => {
-          if (blob) {
-            resolve(blob);
-          } else {
-            reject(new Error('Could not create blob from canvas'));
-          }
-        },
-        'image/jpeg',
-        0.92
-      );
     };
     
     img.onerror = () => {
