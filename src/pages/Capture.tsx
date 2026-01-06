@@ -36,21 +36,19 @@ export default function Capture() {
   const uploadPhoto = useUploadPhoto();
 
   const [companyName, setCompanyName] = useState<string>('');
-  const [projectId, setProjectId] = useState<string>('');
+  const [projectName, setProjectName] = useState<string>('');
   const [templateId, setTemplateId] = useState<string>('');
   const [activity, setActivity] = useState<string>('');
   const [showStamp, setShowStamp] = useState(true);
   const [isCapturing, setIsCapturing] = useState(false);
 
-  const filteredProjects = allProjects;
-  const selectedProject = filteredProjects.find(p => p.id === projectId);
   const selectedTemplate = templates.find(t => t.id === templateId);
 
   const handleCaptureClick = () => {
-    if (!companyName.trim() || !projectId) {
+    if (!companyName.trim() || !projectName.trim()) {
       toast({
         title: 'Campos obrigatórios',
-        description: 'Preencha empresa e selecione projeto antes de capturar.',
+        description: 'Preencha empresa e projeto antes de capturar.',
         variant: 'destructive',
       });
       return;
@@ -80,7 +78,7 @@ export default function Capture() {
             latitude: position?.latitude,
             longitude: position?.longitude,
             userName: profile.full_name,
-            projectName: selectedProject?.name,
+            projectName: projectName.trim(),
             companyName: companyName.trim(),
           });
         } catch (stampError) {
@@ -92,9 +90,9 @@ export default function Capture() {
       if (isOnline) {
         // Upload directly
         await uploadPhoto.mutateAsync({
-          companyId: selectedProject?.company_id || '',
+          companyId: '',
           companySlug: 'manual',
-          projectId,
+          projectId: '',
           templateId: templateId || null,
           activityText: activity || null,
           deviceTimestamp,
@@ -115,10 +113,10 @@ export default function Capture() {
         // Save to IndexedDB for later
         await savePending.mutateAsync({
           id: generateId(),
-          companyId: selectedProject?.company_id || '',
+          companyId: '',
           companyName: companyName.trim(),
-          projectId,
-          projectName: selectedProject?.name || '',
+          projectId: '',
+          projectName: projectName.trim(),
           templateId: templateId || null,
           templateName: selectedTemplate?.name || null,
           activityText: activity || null,
@@ -191,18 +189,11 @@ export default function Capture() {
             {/* Project */}
             <div className="space-y-2">
               <Label>Projeto/Obra</Label>
-              <Select value={projectId} onValueChange={setProjectId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o projeto" />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredProjects.map(project => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Input
+                placeholder="Digite o nome do projeto..."
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+              />
             </div>
 
             {/* Template */}
