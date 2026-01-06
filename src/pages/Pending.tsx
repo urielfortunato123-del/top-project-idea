@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { usePendingPhotos, useSyncPendingPhotos } from '@/hooks/usePhotos';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
+import { useNotifications } from '@/hooks/useNotifications';
 import { BottomNav } from '@/components/BottomNav';
 import { SyncIndicator } from '@/components/SyncIndicator';
 import { PhotoCard } from '@/components/PhotoCard';
@@ -17,6 +18,7 @@ export default function Pending() {
   const isOnline = useOnlineStatus();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { notifySyncComplete } = useNotifications();
   
   const { data: pendingPhotos = [], isLoading } = usePendingPhotos();
   const syncMutation = useSyncPendingPhotos();
@@ -30,6 +32,9 @@ export default function Pending() {
       const results = await syncMutation.mutateAsync(user.id);
       const successCount = results.filter(r => r.success).length;
       const failCount = results.filter(r => !r.success).length;
+
+      // Send push notification
+      notifySyncComplete(results.length, failCount);
 
       if (successCount > 0) {
         toast({

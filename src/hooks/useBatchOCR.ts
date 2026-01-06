@@ -1,6 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+
+// Callback type for OCR completion notifications
+type OCRNotifyCallback = (photoId: string, success: boolean, confidence?: number) => void;
 
 export interface PhotoWithError {
   id: string;
@@ -44,7 +47,7 @@ interface BatchProcessResult {
   error?: string;
 }
 
-export function useBatchReprocessOCR() {
+export function useBatchReprocessOCR(onNotify?: OCRNotifyCallback) {
   const queryClient = useQueryClient();
   const [progress, setProgress] = useState({ current: 0, total: 0 });
 
@@ -121,8 +124,11 @@ export function useBatchReprocessOCR() {
               success: false, 
               error: errorData.error || 'Erro no processamento' 
             });
+            onNotify?.(photo.id, false);
           } else {
+            const data = await response.json();
             results.push({ photoId: photo.id, success: true });
+            onNotify?.(photo.id, true, data.confidence);
           }
         } catch (err) {
           results.push({ 
@@ -130,6 +136,7 @@ export function useBatchReprocessOCR() {
             success: false, 
             error: err instanceof Error ? err.message : 'Erro desconhecido' 
           });
+          onNotify?.(photo.id, false);
         }
 
         // Small delay between requests to avoid overwhelming the API

@@ -2,8 +2,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { usePendingPhotos, usePhotoRecords, useSyncPendingPhotos } from '@/hooks/usePhotos';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
+import { useNotifications } from '@/hooks/useNotifications';
 import { BottomNav } from '@/components/BottomNav';
 import { SyncIndicator } from '@/components/SyncIndicator';
+import { NotificationToggle } from '@/components/NotificationToggle';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Camera, Images, Clock, CheckCircle, AlertCircle, CloudUpload, RefreshCw, BarChart3 } from 'lucide-react';
@@ -14,6 +16,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const isOnline = useOnlineStatus();
   const { toast } = useToast();
+  const { notifySyncComplete } = useNotifications();
   
   const { data: pendingPhotos = [] } = usePendingPhotos();
   const { data: photoRecords = [] } = usePhotoRecords();
@@ -30,6 +33,9 @@ export default function Dashboard() {
       const results = await syncMutation.mutateAsync(user.id);
       const successCount = results.filter(r => r.success).length;
       const failCount = results.filter(r => !r.success).length;
+
+      // Send push notification
+      notifySyncComplete(results.length, failCount);
 
       if (successCount > 0) {
         toast({
@@ -90,12 +96,15 @@ export default function Dashboard() {
                 <span className="text-xs text-primary font-medium">Administrador</span>
               )}
             </div>
-            <SyncIndicator
-              isOnline={isOnline}
-              isSyncing={syncMutation.isPending}
-              pendingCount={pendingCount}
-              onSync={handleSync}
-            />
+            <div className="flex items-center gap-2">
+              <NotificationToggle />
+              <SyncIndicator
+                isOnline={isOnline}
+                isSyncing={syncMutation.isPending}
+                pendingCount={pendingCount}
+                onSync={handleSync}
+              />
+            </div>
           </div>
         </div>
       </header>

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { usePhotosWithOCRErrors, useBatchReprocessOCR } from '@/hooks/useBatchOCR';
+import { useNotifications } from '@/hooks/useNotifications';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -17,8 +18,18 @@ import {
 
 export function BatchOCRPanel() {
   const { toast } = useToast();
+  const { notifyOCRComplete, notifyOCRError } = useNotifications();
   const { data: errorPhotos = [], isLoading } = usePhotosWithOCRErrors();
-  const { mutateAsync: batchReprocess, isPending, progress } = useBatchReprocessOCR();
+  
+  const handleOCRNotify = useCallback((photoId: string, success: boolean, confidence?: number) => {
+    if (success && confidence !== undefined) {
+      notifyOCRComplete(photoId, confidence);
+    } else if (!success) {
+      notifyOCRError(photoId);
+    }
+  }, [notifyOCRComplete, notifyOCRError]);
+  
+  const { mutateAsync: batchReprocess, isPending, progress } = useBatchReprocessOCR(handleOCRNotify);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [lastResults, setLastResults] = useState<{ success: number; failed: number } | null>(null);
 
