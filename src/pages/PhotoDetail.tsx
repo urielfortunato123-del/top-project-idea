@@ -185,11 +185,11 @@ export default function PhotoDetail() {
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div className="flex items-center gap-2">
                 <Building className="h-4 w-4 text-muted-foreground" />
-                <span className="truncate">{photo.companies?.name || 'N/A'}</span>
+                <span className="truncate">{photo.company_name || photo.companies?.name || 'N/A'}</span>
               </div>
               <div className="flex items-center gap-2">
                 <FolderOpen className="h-4 w-4 text-muted-foreground" />
-                <span className="truncate">{photo.projects?.name || 'N/A'}</span>
+                <span className="truncate">{photo.project_name || photo.projects?.name || 'N/A'}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
