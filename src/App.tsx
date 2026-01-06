@@ -74,7 +74,7 @@ function AppRoutes() {
       <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
       <Route path="/admin-dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
       <Route path="/photo-browser" element={<AdminRoute><PhotoBrowser /></AdminRoute>} />
-      <Route path="/photo-map" element={<AdminRoute><PhotoMap /></AdminRoute>} />
+      <Route path="/photo-map" element={<ProtectedRoute><PhotoMap /></ProtectedRoute>} />
       <Route path="/reports" element={<AdminRoute><Reports /></AdminRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>

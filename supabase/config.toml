@@ -7,3 +7,7 @@ verify_jwt = false
 [functions.generate-report]
 enabled = true
 verify_jwt = false
+
+[functions.admin-create-user]
+enabled = true
+verify_jwt = false
