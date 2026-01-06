@@ -37,6 +37,7 @@ export default function Capture() {
 
   const [companyName, setCompanyName] = useState<string>('');
   const [projectName, setProjectName] = useState<string>('');
+  const [frenteServico, setFrenteServico] = useState<string>('');
   const [templateId, setTemplateId] = useState<string>('');
   const [activity, setActivity] = useState<string>('');
   const [showStamp, setShowStamp] = useState(true);
@@ -59,6 +60,7 @@ export default function Capture() {
   const resetForm = () => {
     setCompanyName('');
     setProjectName('');
+    setFrenteServico('');
     setTemplateId('');
     setActivity('');
     if (fileInputRef.current) {
@@ -74,6 +76,7 @@ export default function Capture() {
     const deviceTimestamp = new Date();
     const trimmedCompany = companyName.trim();
     const trimmedProject = projectName.trim();
+    const trimmedFrente = frenteServico.trim() || 'Geral';
     const trimmedActivity = activity || null;
     const selectedTemplateId = templateId || null;
 
@@ -97,6 +100,7 @@ export default function Capture() {
             userName: profile.full_name,
             projectName: trimmedProject,
             companyName: trimmedCompany,
+            frenteServico: trimmedFrente,
           });
         } catch (stampError) {
           console.error('Error applying stamp:', stampError);
@@ -108,6 +112,7 @@ export default function Capture() {
           companySlug: 'manual',
           companyName: trimmedCompany,
           projectName: trimmedProject,
+          frenteServico: trimmedFrente,
           templateId: selectedTemplateId,
           activityText: trimmedActivity,
           deviceTimestamp,
@@ -131,6 +136,7 @@ export default function Capture() {
           companyName: trimmedCompany,
           projectId: '',
           projectName: trimmedProject,
+          frenteServico: trimmedFrente,
           templateId: selectedTemplateId,
           templateName: selectedTemplate?.name || null,
           activityText: trimmedActivity,
@@ -208,6 +214,16 @@ export default function Capture() {
                 placeholder="Digite o nome do projeto..."
                 value={projectName}
                 onChange={(e) => setProjectName(e.target.value)}
+              />
+            </div>
+
+            {/* Frente de Serviço */}
+            <div className="space-y-2">
+              <Label>Frente de Serviço</Label>
+              <Input
+                placeholder="Ex: Fundação, Concretagem, Alvenaria..."
+                value={frenteServico}
+                onChange={(e) => setFrenteServico(e.target.value)}
               />
             </div>
 

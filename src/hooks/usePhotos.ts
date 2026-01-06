@@ -69,6 +69,7 @@ interface UploadPhotoParams {
   companyName: string;
   projectId?: string;
   projectName: string;
+  frenteServico: string;
   templateId: string | null;
   activityText: string | null;
   deviceTimestamp: Date;
@@ -87,11 +88,17 @@ export function useUploadPhoto() {
   return useMutation({
     mutationFn: async (params: UploadPhotoParams) => {
       const timestamp = format(params.deviceTimestamp, 'yyyyMMdd_HHmmss');
-      const dateFolder = format(params.deviceTimestamp, 'yyyy-MM-dd');
+      const dayFolder = format(params.deviceTimestamp, 'dd');
       const monthFolder = format(params.deviceTimestamp, 'yyyy-MM');
-      const userSlug = params.userName.replace(/\s+/g, '_');
       
-      const filePath = `${params.companySlug}/${userSlug}/${monthFolder}/${dateFolder}/${params.templateId || 'geral'}/IMG_${timestamp}.jpg`;
+      // Sanitize folder names
+      const sanitize = (str: string) => str.replace(/[^a-zA-Z0-9_\-]/g, '_').substring(0, 50);
+      const companyFolder = sanitize(params.companyName);
+      const projectFolder = sanitize(params.projectName);
+      const frenteFolder = sanitize(params.frenteServico || 'geral');
+      
+      // Structure: Empresa/Obra/Frente/Mes/Dia/foto.jpg
+      const filePath = `${companyFolder}/${projectFolder}/${frenteFolder}/${monthFolder}/${dayFolder}/IMG_${timestamp}.jpg`;
       
       // Upload to storage
       const { error: uploadError } = await supabase.storage
@@ -116,6 +123,7 @@ export function useUploadPhoto() {
           company_name: params.companyName,
           project_id: params.projectId || null,
           project_name: params.projectName,
+          frente_servico: params.frenteServico || null,
           user_id: params.userId,
           template_id: params.templateId,
           activity_text: params.activityText || null,
@@ -239,6 +247,7 @@ export function useSyncPendingPhotos() {
             companyName: photo.companyName,
             projectId: photo.projectId,
             projectName: photo.projectName,
+            frenteServico: photo.frenteServico || '',
             templateId: photo.templateId,
             activityText: photo.activityText,
             deviceTimestamp: new Date(photo.deviceTimestamp),
