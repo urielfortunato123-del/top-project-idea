@@ -2,71 +2,76 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap');
-
 @layer base {
   :root {
-    /* ObraPhoto - Dark Professional Theme */
-    --background: 220 20% 8%;
-    --foreground: 220 15% 95%;
+    /* Modern Dark Theme with Glassmorphism */
+    --background: 240 10% 4%;
+    --foreground: 0 0% 98%;
 
-    --card: 220 20% 12%;
-    --card-foreground: 220 15% 95%;
+    --card: 240 10% 8%;
+    --card-foreground: 0 0% 98%;
 
-    --popover: 220 20% 14%;
-    --popover-foreground: 220 15% 95%;
+    --popover: 240 10% 10%;
+    --popover-foreground: 0 0% 98%;
 
-    /* Primary - Industrial Orange */
-    --primary: 25 95% 53%;
+    /* Primary - Electric Blue */
+    --primary: 217 91% 60%;
     --primary-foreground: 0 0% 100%;
 
     /* Secondary - Dark Steel */
-    --secondary: 220 15% 18%;
-    --secondary-foreground: 220 15% 90%;
+    --secondary: 240 10% 14%;
+    --secondary-foreground: 0 0% 90%;
 
-    --muted: 220 15% 16%;
-    --muted-foreground: 220 10% 55%;
+    --muted: 240 10% 12%;
+    --muted-foreground: 240 5% 50%;
 
-    /* Accent - Construction Yellow */
-    --accent: 45 100% 51%;
-    --accent-foreground: 220 20% 10%;
+    /* Accent - Cyan Glow */
+    --accent: 189 94% 43%;
+    --accent-foreground: 240 10% 4%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 15% 20%;
-    --input: 220 15% 20%;
-    --ring: 25 95% 53%;
+    --border: 240 10% 16%;
+    --input: 240 10% 16%;
+    --ring: 217 91% 60%;
 
-    --radius: 0.75rem;
+    --radius: 1rem;
 
-    /* Success - Green */
-    --success: 142 72% 45%;
+    /* Success - Emerald */
+    --success: 160 84% 39%;
     --success-foreground: 0 0% 100%;
 
     /* Warning - Amber */
     --warning: 38 92% 50%;
-    --warning-foreground: 220 20% 10%;
+    --warning-foreground: 240 10% 4%;
 
-    /* Info - Blue */
-    --info: 210 100% 55%;
+    /* Info - Sky */
+    --info: 199 89% 48%;
     --info-foreground: 0 0% 100%;
 
+    /* Glass Effect Variables */
+    --glass-bg: 240 10% 10% / 0.6;
+    --glass-border: 240 10% 30% / 0.3;
+    --glass-blur: 20px;
+
     /* Gradients */
-    --gradient-hero: linear-gradient(135deg, hsl(25 95% 50%) 0%, hsl(35 100% 55%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(220 20% 12%) 0%, hsl(220 20% 15%) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(189 94% 43%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(189 94% 43%) 0%, hsl(160 84% 39%) 100%);
+    --gradient-dark: linear-gradient(180deg, hsl(240 10% 6%) 0%, hsl(240 10% 3%) 100%);
 
     /* Shadows */
-    --shadow-glow: 0 0 30px hsl(25 95% 55% / 0.4);
+    --shadow-glow: 0 0 30px hsl(217 91% 60% / 0.3);
+    --shadow-glass: 0 8px 32px hsl(0 0% 0% / 0.4);
 
-    --sidebar-background: 220 20% 10%;
-    --sidebar-foreground: 220 15% 90%;
-    --sidebar-primary: 25 95% 53%;
+    --sidebar-background: 240 10% 6%;
+    --sidebar-foreground: 0 0% 90%;
+    --sidebar-primary: 217 91% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 15% 18%;
-    --sidebar-accent-foreground: 220 15% 90%;
-    --sidebar-border: 220 15% 20%;
-    --sidebar-ring: 25 95% 53%;
+    --sidebar-accent: 240 10% 14%;
+    --sidebar-accent-foreground: 0 0% 90%;
+    --sidebar-border: 240 10% 16%;
+    --sidebar-ring: 217 91% 60%;
   }
 }
 
@@ -77,49 +82,129 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    background-image: 
+      radial-gradient(ellipse 80% 50% at 50% -20%, hsl(217 91% 60% / 0.15), transparent),
+      radial-gradient(ellipse 60% 40% at 100% 100%, hsl(189 94% 43% / 0.1), transparent);
+    background-attachment: fixed;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply font-display font-bold tracking-tight;
+    @apply font-display font-semibold tracking-tight;
   }
 }
 
 @layer components {
+  /* Glassmorphism Card */
   .glass-card {
-    @apply bg-card/80 backdrop-blur-md border border-border/50;
+    @apply relative overflow-hidden;
+    background: hsl(var(--glass-bg));
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid hsl(var(--glass-border));
+    box-shadow: var(--shadow-glass);
   }
 
+  .glass-card::before {
+    content: '';
+    @apply absolute inset-0 pointer-events-none;
+    background: linear-gradient(
+      135deg,
+      hsl(0 0% 100% / 0.08) 0%,
+      transparent 50%
+    );
+  }
+
+  /* Glass Header */
+  .glass-header {
+    @apply sticky top-0 z-40;
+    background: hsl(var(--glass-bg));
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border-bottom: 1px solid hsl(var(--glass-border));
+  }
+
+  /* Glass Nav */
+  .glass-nav {
+    @apply fixed bottom-0 left-0 right-0 z-50;
+    background: hsl(var(--glass-bg));
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border-top: 1px solid hsl(var(--glass-border));
+  }
+
+  /* Status Badges */
   .status-synced {
-    @apply bg-success/10 text-success border-success/30;
+    @apply bg-success/20 text-success border-success/30;
   }
 
   .status-pending {
-    @apply bg-warning/10 text-warning border-warning/30;
+    @apply bg-warning/20 text-warning border-warning/30;
   }
 
   .status-error {
-    @apply bg-destructive/10 text-destructive border-destructive/30;
+    @apply bg-destructive/20 text-destructive border-destructive/30;
   }
 
+  /* Modern Capture Button */
   .capture-btn {
     @apply relative overflow-hidden transition-all duration-300;
+    background: var(--gradient-primary);
     box-shadow: var(--shadow-glow);
   }
 
   .capture-btn::before {
     content: '';
-    @apply absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 transition-opacity;
+    @apply absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 transition-opacity duration-200;
   }
 
-  .capture-btn:active::before {
+  .capture-btn:hover::before {
     @apply opacity-100;
   }
 
+  .capture-btn:active {
+    transform: scale(0.98);
+  }
+
+  /* Glow Effect */
+  .glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .glow-accent {
+    box-shadow: 0 0 30px hsl(189 94% 43% / 0.3);
+  }
+
+  /* Icon Container with Gradient */
+  .icon-gradient {
+    @apply relative p-2.5 rounded-xl;
+    background: var(--gradient-primary);
+  }
+
+  .icon-gradient-accent {
+    @apply relative p-2.5 rounded-xl;
+    background: var(--gradient-accent);
+  }
+
+  /* PWA Safe Area */
   .pwa-safe-area {
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
+  }
+
+  /* Stat Card */
+  .stat-card {
+    @apply glass-card rounded-2xl p-4 text-center transition-transform duration-200;
+  }
+
+  .stat-card:hover {
+    transform: translateY(-2px);
+  }
+
+  /* Modern Input */
+  .modern-input {
+    @apply bg-secondary/50 border-border/50 focus:border-primary/50 focus:ring-primary/20 transition-all duration-200;
   }
 }
 
@@ -134,25 +219,82 @@
 
   @keyframes pulse-glow {
     0%, 100% {
-      box-shadow: 0 0 20px hsl(25 95% 53% / 0.3);
+      box-shadow: 0 0 20px hsl(217 91% 60% / 0.3);
     }
     50% {
-      box-shadow: 0 0 40px hsl(25 95% 53% / 0.5);
+      box-shadow: 0 0 40px hsl(217 91% 60% / 0.5);
     }
   }
 
   .animate-slide-up {
-    animation: slide-up 0.3s ease-out;
+    animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   @keyframes slide-up {
     from {
       opacity: 0;
-      transform: translateY(10px);
+      transform: translateY(20px);
     }
     to {
       opacity: 1;
       transform: translateY(0);
+    }
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.3s ease-out;
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .animate-scale-in {
+    animation: scale-in 0.2s ease-out;
+  }
+
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  /* Gradient Text */
+  .text-gradient {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Shimmer Effect */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--secondary)) 50%,
+      hsl(var(--muted)) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
     }
   }
 }
