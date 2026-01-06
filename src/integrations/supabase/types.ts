@@ -182,7 +182,8 @@ export type Database = {
         Row: {
           accuracy: number | null
           activity_text: string | null
-          company_id: string
+          company_id: string | null
+          company_name: string | null
           created_at: string
           device_timestamp: string
           file_path: string
@@ -197,7 +198,8 @@ export type Database = {
           processing_completed_at: string | null
           processing_error: string | null
           processing_started_at: string | null
-          project_id: string
+          project_id: string | null
+          project_name: string | null
           server_timestamp: string
           show_stamp: boolean
           status: string
@@ -207,7 +209,8 @@ export type Database = {
         Insert: {
           accuracy?: number | null
           activity_text?: string | null
-          company_id: string
+          company_id?: string | null
+          company_name?: string | null
           created_at?: string
           device_timestamp: string
           file_path: string
@@ -222,7 +225,8 @@ export type Database = {
           processing_completed_at?: string | null
           processing_error?: string | null
           processing_started_at?: string | null
-          project_id: string
+          project_id?: string | null
+          project_name?: string | null
           server_timestamp?: string
           show_stamp?: boolean
           status?: string
@@ -232,7 +236,8 @@ export type Database = {
         Update: {
           accuracy?: number | null
           activity_text?: string | null
-          company_id?: string
+          company_id?: string | null
+          company_name?: string | null
           created_at?: string
           device_timestamp?: string
           file_path?: string
@@ -247,7 +252,8 @@ export type Database = {
           processing_completed_at?: string | null
           processing_error?: string | null
           processing_started_at?: string | null
-          project_id?: string
+          project_id?: string | null
+          project_name?: string | null
           server_timestamp?: string
           show_stamp?: boolean
           status?: string

@@ -90,9 +90,9 @@ export default function Capture() {
       if (isOnline) {
         // Upload directly
         await uploadPhoto.mutateAsync({
-          companyId: '',
           companySlug: 'manual',
-          projectId: '',
+          companyName: companyName.trim(),
+          projectName: projectName.trim(),
           templateId: templateId || null,
           activityText: activity || null,
           deviceTimestamp,

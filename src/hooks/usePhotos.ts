@@ -64,9 +64,11 @@ export function usePendingPhotos() {
 }
 
 interface UploadPhotoParams {
-  companyId: string;
+  companyId?: string;
   companySlug: string;
-  projectId: string;
+  companyName: string;
+  projectId?: string;
+  projectName: string;
   templateId: string | null;
   activityText: string | null;
   deviceTimestamp: Date;
@@ -110,8 +112,10 @@ export function useUploadPhoto() {
       const { data, error } = await supabase
         .from('photo_records')
         .insert({
-          company_id: params.companyId,
-          project_id: params.projectId,
+          company_id: params.companyId || null,
+          company_name: params.companyName,
+          project_id: params.projectId || null,
+          project_name: params.projectName,
           user_id: params.userId,
           template_id: params.templateId,
           activity_text: params.activityText || null,
@@ -207,14 +211,19 @@ export function useSyncPendingPhotos() {
         try {
           await updatePendingPhotoStatus(photo.id, 'uploading');
           
-          // Get company slug
-          const { data: company } = await supabase
-            .from('companies')
-            .select('slug')
-            .eq('id', photo.companyId)
-            .single();
-
-          if (!company) throw new Error('Empresa não encontrada');
+          // Get company slug if companyId exists
+          let companySlug = 'manual';
+          if (photo.companyId) {
+            const { data: company } = await supabase
+              .from('companies')
+              .select('slug')
+              .eq('id', photo.companyId)
+              .maybeSingle();
+            
+            if (company) {
+              companySlug = company.slug;
+            }
+          }
 
           // Get user name
           const { data: profile } = await supabase
@@ -226,8 +235,10 @@ export function useSyncPendingPhotos() {
           // Upload triggers OCR automatically now
           await uploadPhoto.mutateAsync({
             companyId: photo.companyId,
-            companySlug: company.slug,
+            companySlug: companySlug,
+            companyName: photo.companyName,
             projectId: photo.projectId,
+            projectName: photo.projectName,
             templateId: photo.templateId,
             activityText: photo.activityText,
             deviceTimestamp: new Date(photo.deviceTimestamp),
