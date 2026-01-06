@@ -56,45 +56,60 @@ export default function Capture() {
     fileInputRef.current?.click();
   };
 
+  const resetForm = () => {
+    setCompanyName('');
+    setProjectName('');
+    setTemplateId('');
+    setActivity('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user || !profile) return;
 
     setIsCapturing(true);
+    const deviceTimestamp = new Date();
+    const trimmedCompany = companyName.trim();
+    const trimmedProject = projectName.trim();
+    const trimmedActivity = activity || null;
+    const selectedTemplateId = templateId || null;
 
     try {
-      // Get GPS
-      const position = await getPosition();
-      const deviceTimestamp = new Date();
+      // Get GPS in parallel with image processing
+      const [position, arrayBuffer] = await Promise.all([
+        getPosition().catch(() => null),
+        file.arrayBuffer()
+      ]);
 
-      // Convert file to blob
-      let imageBlob = new Blob([await file.arrayBuffer()], { type: 'image/jpeg' });
+      // Use file directly as blob (faster than re-creating)
+      let imageBlob: Blob = file;
 
       // Apply stamp if enabled
       if (showStamp) {
         try {
-          imageBlob = await drawStampOnImage(imageBlob, {
+          imageBlob = await drawStampOnImage(file, {
             timestamp: deviceTimestamp,
             latitude: position?.latitude,
             longitude: position?.longitude,
             userName: profile.full_name,
-            projectName: projectName.trim(),
-            companyName: companyName.trim(),
+            projectName: trimmedProject,
+            companyName: trimmedCompany,
           });
         } catch (stampError) {
           console.error('Error applying stamp:', stampError);
-          // Continue with original image if stamp fails
         }
       }
 
       if (isOnline) {
-        // Upload directly
         await uploadPhoto.mutateAsync({
           companySlug: 'manual',
-          companyName: companyName.trim(),
-          projectName: projectName.trim(),
-          templateId: templateId || null,
-          activityText: activity || null,
+          companyName: trimmedCompany,
+          projectName: trimmedProject,
+          templateId: selectedTemplateId,
+          activityText: trimmedActivity,
           deviceTimestamp,
           latitude: position?.latitude ?? null,
           longitude: position?.longitude ?? null,
@@ -107,19 +122,18 @@ export default function Capture() {
 
         toast({
           title: 'Foto enviada!',
-          description: 'A foto foi salva no servidor com sucesso.',
+          description: 'A foto foi salva no servidor.',
         });
       } else {
-        // Save to IndexedDB for later
         await savePending.mutateAsync({
           id: generateId(),
           companyId: '',
-          companyName: companyName.trim(),
+          companyName: trimmedCompany,
           projectId: '',
-          projectName: projectName.trim(),
-          templateId: templateId || null,
+          projectName: trimmedProject,
+          templateId: selectedTemplateId,
           templateName: selectedTemplate?.name || null,
-          activityText: activity || null,
+          activityText: trimmedActivity,
           deviceTimestamp: deviceTimestamp.toISOString(),
           latitude: position?.latitude ?? null,
           longitude: position?.longitude ?? null,
@@ -136,17 +150,18 @@ export default function Capture() {
         });
       }
 
-      // Reset form
-      setActivity('');
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      // Reset entire form after success
+      resetForm();
     } catch (error) {
       toast({
         title: 'Erro na captura',
         description: error instanceof Error ? error.message : 'Não foi possível processar a foto.',
         variant: 'destructive',
       });
+      // Only reset file input on error
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     } finally {
       setIsCapturing(false);
     }
