@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
+import { useEffect } from 'react';
 import { 
   addPendingPhoto, 
   getPendingPhotos, 
@@ -39,6 +40,32 @@ export interface PhotoRecord {
 }
 
 export function usePhotoRecords() {
+  const queryClient = useQueryClient();
+
+  // Set up realtime subscription
+  useEffect(() => {
+    const channel = supabase
+      .channel('photo_records_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'photo_records',
+        },
+        (payload) => {
+          console.log('[Realtime] Photo records updated:', payload.eventType);
+          // Invalidate and refetch when any change occurs
+          queryClient.invalidateQueries({ queryKey: ['photo_records'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
   return useQuery({
     queryKey: ['photo_records'],
     queryFn: async () => {
