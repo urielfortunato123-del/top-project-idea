@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
-import { useEffect } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
+import { toast } from 'sonner';
 import { 
   addPendingPhoto, 
   getPendingPhotos, 
@@ -39,8 +40,66 @@ export interface PhotoRecord {
   templates?: { name: string; icon: string } | null;
 }
 
+// Notification sound using Web Audio API
+function playNotificationSound() {
+  try {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+    oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.1);
+    oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.2);
+    
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.3);
+  } catch (error) {
+    console.log('[Sound] Could not play notification sound:', error);
+  }
+}
+
 export function usePhotoRecords() {
   const queryClient = useQueryClient();
+  const isInitialLoad = useRef(true);
+  const currentUserId = useRef<string | null>(null);
+
+  // Get current user ID
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      currentUserId.current = data.user?.id || null;
+    });
+  }, []);
+
+  const showNewPhotoNotification = useCallback((payload: any) => {
+    // Don't show notification for own photos
+    if (payload.new?.user_id === currentUserId.current) {
+      return;
+    }
+
+    const projectName = payload.new?.project_name || 'Projeto';
+    const frenteServico = payload.new?.frente_servico || '';
+    
+    // Play sound
+    playNotificationSound();
+    
+    // Show toast with photo preview
+    toast.success('📸 Nova foto recebida!', {
+      description: `${projectName}${frenteServico ? ` - ${frenteServico}` : ''}`,
+      duration: 5000,
+      action: payload.new?.file_url ? {
+        label: 'Ver',
+        onClick: () => {
+          window.open(payload.new.file_url, '_blank');
+        },
+      } : undefined,
+    });
+  }, []);
 
   // Set up realtime subscription
   useEffect(() => {
@@ -55,16 +114,28 @@ export function usePhotoRecords() {
         },
         (payload) => {
           console.log('[Realtime] Photo records updated:', payload.eventType);
+          
+          // Show notification only for INSERT events after initial load
+          if (payload.eventType === 'INSERT' && !isInitialLoad.current) {
+            showNewPhotoNotification(payload);
+          }
+          
           // Invalidate and refetch when any change occurs
           queryClient.invalidateQueries({ queryKey: ['photo_records'] });
         }
       )
       .subscribe();
 
+    // Mark initial load as complete after a short delay
+    const timeout = setTimeout(() => {
+      isInitialLoad.current = false;
+    }, 2000);
+
     return () => {
+      clearTimeout(timeout);
       supabase.removeChannel(channel);
     };
-  }, [queryClient]);
+  }, [queryClient, showNewPhotoNotification]);
 
   return useQuery({
     queryKey: ['photo_records'],
