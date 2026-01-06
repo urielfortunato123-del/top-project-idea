@@ -1,8 +1,10 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { usePendingPhotos, usePhotoRecords, useSyncPendingPhotos } from '@/hooks/usePhotos';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useGeolocation } from '@/hooks/useGeolocation';
 import { BottomNav } from '@/components/BottomNav';
 import { SyncIndicator } from '@/components/SyncIndicator';
 import { NotificationToggle } from '@/components/NotificationToggle';
@@ -17,10 +19,21 @@ export default function Dashboard() {
   const isOnline = useOnlineStatus();
   const { toast } = useToast();
   const { notifySyncComplete } = useNotifications();
+  const { getPosition } = useGeolocation();
   
   const { data: pendingPhotos = [] } = usePendingPhotos();
   const { data: photoRecords = [] } = usePhotoRecords();
   const syncMutation = useSyncPendingPhotos();
+
+  // Request location permission on mount (for mobile)
+  useEffect(() => {
+    // Small delay to ensure the page is fully loaded
+    const timer = setTimeout(() => {
+      getPosition();
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, [getPosition]);
 
   const pendingCount = pendingPhotos.filter(p => p.status === 'pending' || p.status === 'error').length;
   const uploadedCount = photoRecords.length;
