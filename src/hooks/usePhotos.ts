@@ -189,6 +189,8 @@ export function useUploadPhoto() {
   return useMutation({
     mutationFn: async (params: UploadPhotoParams) => {
       const timestamp = format(params.deviceTimestamp, 'yyyyMMdd_HHmmss');
+      const ms = params.deviceTimestamp.getMilliseconds().toString().padStart(3, '0');
+      const nonce = Math.random().toString(36).slice(2, 8);
       const dayFolder = format(params.deviceTimestamp, 'dd');
       const monthFolder = format(params.deviceTimestamp, 'yyyy-MM');
       
@@ -199,7 +201,8 @@ export function useUploadPhoto() {
       const frenteFolder = sanitize(params.frenteServico || 'geral');
       
       // Structure: Empresa/Obra/Frente/Mes/Dia/foto.jpg
-      const filePath = `${companyFolder}/${projectFolder}/${frenteFolder}/${monthFolder}/${dayFolder}/IMG_${timestamp}.jpg`;
+      // Add ms+nonce to avoid collisions when taking multiple photos quickly.
+      const filePath = `${companyFolder}/${projectFolder}/${frenteFolder}/${monthFolder}/${dayFolder}/IMG_${timestamp}_${ms}_${nonce}.jpg`;
       
       // Upload to storage
       const { error: uploadError } = await supabase.storage
