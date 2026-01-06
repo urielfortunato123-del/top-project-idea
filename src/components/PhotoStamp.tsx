@@ -8,6 +8,7 @@ interface PhotoStampProps {
   userName?: string;
   projectName?: string;
   companyName?: string;
+  frenteServico?: string;
 }
 
 export function PhotoStamp({
@@ -17,6 +18,7 @@ export function PhotoStamp({
   userName,
   projectName,
   companyName,
+  frenteServico,
 }: PhotoStampProps) {
   const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
   
@@ -42,6 +44,7 @@ export function PhotoStamp({
         <div>{coordsText}</div>
         {userName && <div>{userName}</div>}
         {projectName && <div>{projectName}</div>}
+        {frenteServico && <div>{frenteServico}</div>}
         {companyName && <div className="text-[10px] opacity-80">{companyName}</div>}
       </div>
     </div>
@@ -58,6 +61,7 @@ export async function drawStampOnImage(
     userName?: string;
     projectName?: string;
     companyName?: string;
+    frenteServico?: string;
   }
 ): Promise<Blob> {
   return new Promise((resolve, reject) => {
@@ -95,6 +99,7 @@ export async function drawStampOnImage(
         // Add company and project first (more prominent)
         if (stampData.companyName) lines.push(`🏢 ${stampData.companyName}`);
         if (stampData.projectName) lines.push(`📁 ${stampData.projectName}`);
+        if (stampData.frenteServico) lines.push(`🔧 ${stampData.frenteServico}`);
         if (stampData.userName) lines.push(`👤 ${stampData.userName}`);
         lines.push(`📅 ${formattedDate}`);
         lines.push(`📍 ${coordsText}`);

@@ -188,6 +188,7 @@ export type Database = {
           device_timestamp: string
           file_path: string
           file_url: string
+          frente_servico: string | null
           id: string
           latitude: number | null
           longitude: number | null
@@ -215,6 +216,7 @@ export type Database = {
           device_timestamp: string
           file_path: string
           file_url: string
+          frente_servico?: string | null
           id?: string
           latitude?: number | null
           longitude?: number | null
@@ -242,6 +244,7 @@ export type Database = {
           device_timestamp?: string
           file_path?: string
           file_url?: string
+          frente_servico?: string | null
           id?: string
           latitude?: number | null
           longitude?: number | null

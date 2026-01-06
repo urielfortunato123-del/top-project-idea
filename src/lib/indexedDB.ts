@@ -6,6 +6,7 @@ export interface PendingPhoto {
   companyName: string;
   projectId: string;
   projectName: string;
+  frenteServico: string;
   templateId: string | null;
   templateName: string | null;
   activityText: string | null;
