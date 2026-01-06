@@ -13,8 +13,8 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Camera, MapPin, Clock, ChevronLeft, Loader2 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { Camera, Clock, ChevronLeft, Loader2 } from 'lucide-react';
+import { drawStampOnImage } from '@/components/PhotoStamp';
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
@@ -71,7 +71,24 @@ export default function Capture() {
       const deviceTimestamp = new Date();
 
       // Convert file to blob
-      const imageBlob = new Blob([await file.arrayBuffer()], { type: 'image/jpeg' });
+      let imageBlob = new Blob([await file.arrayBuffer()], { type: 'image/jpeg' });
+
+      // Apply stamp if enabled
+      if (showStamp) {
+        try {
+          imageBlob = await drawStampOnImage(imageBlob, {
+            timestamp: deviceTimestamp,
+            latitude: position?.latitude,
+            longitude: position?.longitude,
+            userName: profile.full_name,
+            projectName: selectedProject?.name,
+            companyName: selectedCompany?.name,
+          });
+        } catch (stampError) {
+          console.error('Error applying stamp:', stampError);
+          // Continue with original image if stamp fails
+        }
+      }
 
       if (isOnline) {
         // Upload directly
