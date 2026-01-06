@@ -51,21 +51,21 @@ export function PhotoCard({ photo, isPending = false }: PhotoCardProps) {
       )}
       onClick={handleClick}
     >
-      <div className="relative aspect-[4/3] bg-muted">
+      <div className="relative aspect-square bg-muted">
         <img
           src={imageUrl}
           alt="Foto de obra"
           className="w-full h-full object-cover"
         />
-        <div className="absolute top-2 right-2 flex items-center gap-1">
+        <div className="absolute top-1 right-1 flex items-center gap-1">
           {ocrStatus === 'completed' && ocrConfidence && (
             <div className={cn(
-              "flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium",
+              "flex items-center gap-0.5 px-1 py-0.5 rounded text-[10px] font-medium",
               ocrConfidence >= 80 ? "bg-green-500/90 text-white" :
               ocrConfidence >= 60 ? "bg-yellow-500/90 text-black" :
               "bg-red-500/90 text-white"
             )}>
-              <Sparkles className="h-3 w-3" />
+              <Sparkles className="h-2.5 w-2.5" />
               {ocrConfidence}%
             </div>
           )}
@@ -73,16 +73,16 @@ export function PhotoCard({ photo, isPending = false }: PhotoCardProps) {
         </div>
         
         {showStamp && (
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
-            <div className="flex flex-col gap-1 text-white text-xs">
-              <div className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {format(new Date(timestamp), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-1.5">
+            <div className="flex flex-col text-white text-[10px]">
+              <div className="flex items-center gap-0.5">
+                <Clock className="h-2.5 w-2.5" />
+                {format(new Date(timestamp), "dd/MM HH:mm", { locale: ptBR })}
               </div>
               {latitude && longitude && (
-                <div className="flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />
-                  {latitude.toFixed(5)}, {longitude.toFixed(5)}
+                <div className="flex items-center gap-0.5">
+                  <MapPin className="h-2.5 w-2.5" />
+                  {latitude.toFixed(4)}, {longitude.toFixed(4)}
                 </div>
               )}
             </div>
@@ -91,18 +91,18 @@ export function PhotoCard({ photo, isPending = false }: PhotoCardProps) {
 
         {isPhotoRecord && (
           <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 hover:opacity-100">
-            <Eye className="h-8 w-8 text-white drop-shadow-lg" />
+            <Eye className="h-6 w-6 text-white drop-shadow-lg" />
           </div>
         )}
       </div>
       
-      <div className="p-3 space-y-1">
-        <p className="font-medium text-sm truncate">{projectName}</p>
-        <p className="text-xs text-muted-foreground truncate">
-          {templateName || 'Sem template'} • {companyName}
+      <div className="p-2 space-y-0.5">
+        <p className="font-medium text-xs truncate">{projectName}</p>
+        <p className="text-[10px] text-muted-foreground truncate">
+          {templateName || 'Geral'} • {companyName}
         </p>
         {!isPhotoRecord && photo.errorMessage && (
-          <p className="text-xs text-destructive truncate">{photo.errorMessage}</p>
+          <p className="text-[10px] text-destructive truncate">{photo.errorMessage}</p>
         )}
       </div>
     </Card>
