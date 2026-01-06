@@ -39,6 +39,28 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, isAdmin, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (!isAdmin) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
+}
+
 function AppRoutes() {
   return (
     <Routes>
@@ -49,11 +71,11 @@ function AppRoutes() {
       <Route path="/photos" element={<ProtectedRoute><Photos /></ProtectedRoute>} />
       <Route path="/photos/:id" element={<ProtectedRoute><PhotoDetail /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-      <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
-      <Route path="/admin-dashboard" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
-      <Route path="/photo-browser" element={<ProtectedRoute><PhotoBrowser /></ProtectedRoute>} />
-      <Route path="/photo-map" element={<ProtectedRoute><PhotoMap /></ProtectedRoute>} />
-      <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+      <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
+      <Route path="/admin-dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+      <Route path="/photo-browser" element={<AdminRoute><PhotoBrowser /></AdminRoute>} />
+      <Route path="/photo-map" element={<AdminRoute><PhotoMap /></AdminRoute>} />
+      <Route path="/reports" element={<AdminRoute><Reports /></AdminRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
