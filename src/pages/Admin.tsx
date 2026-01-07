@@ -34,28 +34,6 @@ export default function Admin() {
 
   const [isLoading, setIsLoading] = useState(false);
 
-  // Redirect if not admin
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Navigate to="/" replace />;
-  }
-
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 p-4">
-        <p className="text-muted-foreground text-center">Acesso restrito a administradores</p>
-        <Button onClick={() => navigate('/dashboard')}>Voltar ao Dashboard</Button>
-      </div>
-    );
-  }
-
   // Company form
   const [companyName, setCompanyName] = useState('');
   const [companySlug, setCompanySlug] = useState('');
@@ -91,12 +69,11 @@ export default function Admin() {
       
       if (rolesError) throw rolesError;
 
-      // Get user emails from auth (this won't work directly, we'll show profile info)
       const usersWithRoles: UserWithRole[] = profiles.map(profile => {
         const userRole = roles.find(r => r.user_id === profile.id);
         return {
           id: profile.id,
-          email: '', // Email not accessible from profiles
+          email: '',
           full_name: profile.full_name,
           role: (userRole?.role as 'admin' | 'colaborador') || 'colaborador',
           created_at: profile.created_at,
@@ -106,6 +83,28 @@ export default function Admin() {
       return usersWithRoles;
     },
   });
+
+  // Conditional renders AFTER all hooks
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 p-4">
+        <p className="text-muted-foreground text-center">Acesso restrito a administradores</p>
+        <Button onClick={() => navigate('/dashboard')}>Voltar ao Dashboard</Button>
+      </div>
+    );
+  }
 
   const handleAddCompany = async (e: React.FormEvent) => {
     e.preventDefault();
