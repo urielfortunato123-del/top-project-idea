@@ -19,6 +19,52 @@ function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
 }
 
+async function convertToJpeg(input: Blob): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(input);
+
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          URL.revokeObjectURL(url);
+          reject(new Error('Canvas indisponível no aparelho.'));
+          return;
+        }
+
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+
+        URL.revokeObjectURL(url);
+
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              reject(new Error('Falha ao converter imagem para JPG.'));
+              return;
+            }
+            resolve(blob);
+          },
+          'image/jpeg',
+          0.9
+        );
+      } catch (err) {
+        URL.revokeObjectURL(url);
+        reject(err);
+      }
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Não foi possível carregar a imagem para conversão.'));
+    };
+
+    img.src = url;
+  });
+}
 export default function Capture() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
@@ -80,16 +126,25 @@ export default function Capture() {
     const selectedTemplateId = templateId || null;
 
     try {
-      const [position, arrayBuffer] = await Promise.all([
-        getPosition().catch(() => null),
-        file.arrayBuffer()
-      ]);
+      // Alguns celulares fracos podem travar se lermos o arquivo inteiro na memória.
+      // Então evitamos file.arrayBuffer() aqui.
+      const position = await getPosition().catch(() => null);
 
+      // Garantir JPEG (o upload usa contentType image/jpeg e extensão .jpg)
       let imageBlob: Blob = file;
+
+      if (file.type && file.type !== 'image/jpeg') {
+        // HEIC/HEIF costuma falhar em WebViews mais antigos
+        if (/image\/(heic|heif)/i.test(file.type)) {
+          throw new Error('Formato de imagem (HEIC) não suportado neste aparelho. Ative "Salvar como JPG" na câmera ou use outro modo.');
+        }
+
+        imageBlob = await convertToJpeg(file);
+      }
 
       if (showStamp) {
         try {
-          imageBlob = await drawStampOnImage(file, {
+          imageBlob = await drawStampOnImage(imageBlob, {
             timestamp: deviceTimestamp,
             latitude: position?.latitude,
             longitude: position?.longitude,
@@ -154,6 +209,7 @@ export default function Capture() {
 
       resetForm();
     } catch (error) {
+      console.error('[Capture] Erro na captura:', error);
       toast({
         title: 'Erro na captura',
         description: error instanceof Error ? error.message : 'Não foi possível processar a foto.',
