@@ -216,7 +216,7 @@ export default function Capture() {
     const trimmedProject = (selectedProject?.name || projectName).trim();
     const trimmedFrente = frenteServico.trim() || 'Geral';
     const trimmedActivity = activity || null;
-    const selectedTemplateId = templateId || null;
+    const selectedTemplateId = templateId && templateId !== 'custom' ? templateId : null;
 
     await savePending.mutateAsync({
       id: generateId(),
@@ -248,7 +248,7 @@ export default function Capture() {
     const trimmedProject = (selectedProject?.name || projectName).trim();
     const trimmedFrente = frenteServico.trim() || 'Geral';
     const trimmedActivity = activity || null;
-    const selectedTemplateId = templateId || null;
+    const selectedTemplateId = templateId && templateId !== 'custom' ? templateId : null;
 
     try {
       appLog.info('[Capture] Enviando foto', { isOnline });
