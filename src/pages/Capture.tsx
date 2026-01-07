@@ -68,10 +68,10 @@ export default function Capture() {
   const selectedTemplate = templates.find(t => t.id === templateId);
 
   const handleCaptureClick = () => {
-    if (!companyName.trim() || !projectId) {
+    if (!companyName.trim() || !projectName.trim()) {
       toast({
         title: 'Campos obrigatórios',
-        description: 'Preencha empresa e selecione projeto antes de capturar.',
+        description: 'Preencha empresa e projeto antes de capturar.',
         variant: 'destructive',
       });
       return;
