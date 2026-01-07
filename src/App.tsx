@@ -40,7 +40,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { user, isAdmin, isLoading } = useAuth();
+  const { user, isAdmin, isLoading, role } = useAuth();
 
   if (isLoading) {
     return (
@@ -52,6 +52,15 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 
   if (!user) {
     return <Navigate to="/" replace />;
+  }
+
+  // Wait role hydration to avoid redirecting an admin before role arrives
+  if (role === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   if (!isAdmin) {
