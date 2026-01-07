@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompanies, useProjects, useTemplates } from '@/hooks/useProjects';
@@ -12,60 +12,24 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Camera, Clock, ChevronLeft, Loader2, Wifi, WifiOff, MapPin, Building2, FolderKanban, Wrench, FileText, Download } from 'lucide-react';
+import { Camera, Clock, ChevronLeft, Loader2, Wifi, WifiOff, MapPin, Building2, FolderKanban, Wrench, FileText, Download, X, Check, RotateCcw } from 'lucide-react';
 import { drawStampOnImage } from '@/components/PhotoStamp';
 import { appLog, downloadAppLog } from '@/lib/appLog';
+import { compressImage, convertToJpeg, blobToDataUrl } from '@/lib/imageUtils';
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
 }
 
-async function convertToJpeg(input: Blob): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(input);
-
-    img.onload = () => {
-      try {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          URL.revokeObjectURL(url);
-          reject(new Error('Canvas indisponível no aparelho.'));
-          return;
-        }
-
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.drawImage(img, 0, 0);
-
-        URL.revokeObjectURL(url);
-
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) {
-              reject(new Error('Falha ao converter imagem para JPG.'));
-              return;
-            }
-            resolve(blob);
-          },
-          'image/jpeg',
-          0.9
-        );
-      } catch (err) {
-        URL.revokeObjectURL(url);
-        reject(err);
-      }
-    };
-
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error('Não foi possível carregar a imagem para conversão.'));
-    };
-
-    img.src = url;
-  });
+interface PreparedPhoto {
+  imageBlob: Blob;
+  previewUrl: string;
+  deviceTimestamp: Date;
+  latitude: number | null;
+  longitude: number | null;
+  accuracy: number | null;
 }
+
 export default function Capture() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
@@ -87,7 +51,11 @@ export default function Capture() {
   const [templateId, setTemplateId] = useState<string>('');
   const [activity, setActivity] = useState<string>('');
   const [showStamp, setShowStamp] = useState(true);
-  const [isCapturing, setIsCapturing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+
+  // Preview state
+  const [preparedPhoto, setPreparedPhoto] = useState<PreparedPhoto | null>(null);
 
   const selectedTemplate = templates.find(t => t.id === templateId);
 
@@ -109,25 +77,35 @@ export default function Capture() {
     setFrenteServico('');
     setTemplateId('');
     setActivity('');
+    setPreparedPhoto(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
+  const cancelPreview = () => {
+    if (preparedPhoto?.previewUrl) {
+      URL.revokeObjectURL(preparedPhoto.previewUrl);
+    }
+    setPreparedPhoto(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Process the photo (compress + stamp) and show preview
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user || !profile) return;
 
-    setIsCapturing(true);
+    setIsProcessing(true);
     const deviceTimestamp = new Date();
     const trimmedCompany = companyName.trim();
     const trimmedProject = projectName.trim();
     const trimmedFrente = frenteServico.trim() || 'Geral';
-    const trimmedActivity = activity || null;
-    const selectedTemplateId = templateId || null;
 
     try {
-      appLog.info('[Capture] Iniciando captura', {
+      appLog.info('[Capture] Iniciando processamento', {
         fileType: file.type,
         fileSize: file.size,
         fileName: file.name,
@@ -139,28 +117,36 @@ export default function Capture() {
         return null;
       });
 
-      // Garantir JPEG - file.type pode ser vazio em alguns navegadores móveis
       let imageBlob: Blob = file;
       const fileType = file.type?.toLowerCase() || '';
 
-      // HEIC/HEIF não é suportado em muitos WebViews
+      // HEIC/HEIF check
       if (fileType.includes('heic') || fileType.includes('heif')) {
         throw new Error('Formato HEIC não suportado. Configure a câmera para salvar fotos em JPG.');
       }
 
-      // Se não for JPEG ou tipo desconhecido, converter para JPEG
+      // Convert to JPEG if needed
       if (fileType !== 'image/jpeg' && fileType !== 'image/jpg') {
         appLog.info('[Capture] Convertendo para JPEG...');
         try {
           imageBlob = await convertToJpeg(file);
-          appLog.info('[Capture] Conversão OK', { newSize: imageBlob.size, type: imageBlob.type });
+          appLog.info('[Capture] Conversão OK', { newSize: imageBlob.size });
         } catch (convErr) {
           appLog.error('[Capture] Erro na conversão', convErr);
-          // Se a conversão falhar, tentar usar o arquivo original
           imageBlob = file;
         }
       }
 
+      // Compress image
+      appLog.info('[Capture] Comprimindo imagem...');
+      try {
+        imageBlob = await compressImage(imageBlob, { maxDimension: 1920, quality: 0.82 });
+      } catch (compErr) {
+        appLog.error('[Capture] Erro na compressão', compErr);
+        // Continue with original if compression fails
+      }
+
+      // Apply stamp if enabled
       if (showStamp) {
         appLog.info('[Capture] Aplicando carimbo...');
         try {
@@ -176,55 +162,125 @@ export default function Capture() {
           appLog.info('[Capture] Carimbo aplicado', { finalSize: imageBlob.size });
         } catch (stampError) {
           appLog.error('[Capture] Erro ao aplicar carimbo', stampError);
-          // Continuar sem o carimbo se falhar
         }
       }
 
+      // Create preview URL
+      const previewUrl = await blobToDataUrl(imageBlob);
+      
+      setPreparedPhoto({
+        imageBlob,
+        previewUrl,
+        deviceTimestamp,
+        latitude: position?.latitude ?? null,
+        longitude: position?.longitude ?? null,
+        accuracy: position?.accuracy ?? null,
+      });
+
+      appLog.info('[Capture] Preview pronto', { size: imageBlob.size });
+    } catch (error) {
+      appLog.error('[Capture] ERRO no processamento', error);
+      const errorMessage = error instanceof Error
+        ? error.message
+        : String(error) || 'Não foi possível processar a foto.';
+
+      toast({
+        title: 'Erro no processamento',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Save pending photo helper
+  const saveAsPending = useCallback(async (photo: PreparedPhoto) => {
+    if (!user || !profile) return;
+
+    const trimmedCompany = companyName.trim();
+    const trimmedProject = projectName.trim();
+    const trimmedFrente = frenteServico.trim() || 'Geral';
+    const trimmedActivity = activity || null;
+    const selectedTemplateId = templateId || null;
+
+    await savePending.mutateAsync({
+      id: generateId(),
+      companyId: '',
+      companyName: trimmedCompany,
+      projectId: '',
+      projectName: trimmedProject,
+      frenteServico: trimmedFrente,
+      templateId: selectedTemplateId,
+      templateName: selectedTemplate?.name || null,
+      activityText: trimmedActivity,
+      deviceTimestamp: photo.deviceTimestamp.toISOString(),
+      latitude: photo.latitude,
+      longitude: photo.longitude,
+      accuracy: photo.accuracy,
+      imageBlob: photo.imageBlob,
+      showStamp,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    });
+  }, [companyName, projectName, frenteServico, activity, templateId, selectedTemplate, showStamp, user, profile, savePending]);
+
+  // Confirm and send the photo
+  const handleConfirmSend = async () => {
+    if (!preparedPhoto || !user || !profile) return;
+
+    setIsSending(true);
+    const trimmedCompany = companyName.trim();
+    const trimmedProject = projectName.trim();
+    const trimmedFrente = frenteServico.trim() || 'Geral';
+    const trimmedActivity = activity || null;
+    const selectedTemplateId = templateId || null;
+
+    try {
       appLog.info('[Capture] Enviando foto', { isOnline });
 
       if (isOnline) {
-        await uploadPhoto.mutateAsync({
-          companySlug: 'manual',
-          companyName: trimmedCompany,
-          projectName: trimmedProject,
-          frenteServico: trimmedFrente,
-          templateId: selectedTemplateId,
-          activityText: trimmedActivity,
-          deviceTimestamp,
-          latitude: position?.latitude ?? null,
-          longitude: position?.longitude ?? null,
-          accuracy: position?.accuracy ?? null,
-          imageBlob,
-          showStamp,
-          userName: profile.full_name,
-          userId: user.id,
-        });
+        try {
+          await uploadPhoto.mutateAsync({
+            companySlug: 'manual',
+            companyName: trimmedCompany,
+            projectName: trimmedProject,
+            frenteServico: trimmedFrente,
+            templateId: selectedTemplateId,
+            activityText: trimmedActivity,
+            deviceTimestamp: preparedPhoto.deviceTimestamp,
+            latitude: preparedPhoto.latitude,
+            longitude: preparedPhoto.longitude,
+            accuracy: preparedPhoto.accuracy,
+            imageBlob: preparedPhoto.imageBlob,
+            showStamp,
+            userName: profile.full_name,
+            userId: user.id,
+          });
 
-        toast({
-          title: 'Foto enviada!',
-          description: 'A foto foi salva no servidor.',
-        });
+          toast({
+            title: 'Foto enviada!',
+            description: 'A foto foi salva no servidor.',
+          });
+          appLog.info('[Capture] Upload online OK');
+        } catch (uploadError) {
+          // FALLBACK: save offline if online upload fails
+          appLog.warn('[Capture] Upload online falhou, salvando offline', uploadError);
+          
+          await saveAsPending(preparedPhoto);
+          
+          toast({
+            title: 'Salva offline (fallback)',
+            description: 'O upload falhou, mas a foto foi salva localmente para sincronizar depois.',
+            variant: 'default',
+          });
+        }
       } else {
-        await savePending.mutateAsync({
-          id: generateId(),
-          companyId: '',
-          companyName: trimmedCompany,
-          projectId: '',
-          projectName: trimmedProject,
-          frenteServico: trimmedFrente,
-          templateId: selectedTemplateId,
-          templateName: selectedTemplate?.name || null,
-          activityText: trimmedActivity,
-          deviceTimestamp: deviceTimestamp.toISOString(),
-          latitude: position?.latitude ?? null,
-          longitude: position?.longitude ?? null,
-          accuracy: position?.accuracy ?? null,
-          imageBlob,
-          showStamp,
-          status: 'pending',
-          createdAt: new Date().toISOString(),
-        });
-
+        await saveAsPending(preparedPhoto);
+        
         toast({
           title: 'Foto salva offline!',
           description: 'Será sincronizada quando houver conexão.',
@@ -235,23 +291,102 @@ export default function Capture() {
       resetForm();
     } catch (error) {
       appLog.error('[Capture] ERRO COMPLETO', error);
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : String(error) || 'Não foi possível processar a foto.';
+      const errorMessage = error instanceof Error
+        ? error.message
+        : String(error) || 'Não foi possível salvar a foto.';
 
       toast({
-        title: 'Erro na captura',
+        title: 'Erro ao salvar',
         description: errorMessage,
         variant: 'destructive',
       });
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
     } finally {
-      setIsCapturing(false);
+      setIsSending(false);
     }
   };
+
+  // Preview Modal
+  if (preparedPhoto) {
+    return (
+      <div className="fixed inset-0 z-50 bg-background flex flex-col">
+        {/* Preview Header */}
+        <header className="glass-header flex items-center justify-between px-4 py-3">
+          <Button variant="ghost" size="icon" onClick={cancelPreview} disabled={isSending}>
+            <X className="h-5 w-5" />
+          </Button>
+          <h1 className="font-display font-semibold">Confirmar Envio</h1>
+          <Button variant="ghost" size="icon" onClick={cancelPreview} disabled={isSending}>
+            <RotateCcw className="h-5 w-5" />
+          </Button>
+        </header>
+
+        {/* Photo Preview */}
+        <div className="flex-1 overflow-hidden p-4">
+          <div className="h-full rounded-2xl overflow-hidden bg-black/20 relative">
+            <img
+              src={preparedPhoto.previewUrl}
+              alt="Preview da foto"
+              className="w-full h-full object-contain"
+            />
+          </div>
+        </div>
+
+        {/* Info */}
+        <div className="px-4 pb-2">
+          <div className="glass-card rounded-xl p-3 text-sm space-y-1">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Building2 className="h-3.5 w-3.5" />
+              <span>{companyName}</span>
+              <span className="mx-1">•</span>
+              <FolderKanban className="h-3.5 w-3.5" />
+              <span>{projectName}</span>
+            </div>
+            {frenteServico && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Wrench className="h-3.5 w-3.5" />
+                <span>{frenteServico || 'Geral'}</span>
+              </div>
+            )}
+            <div className="text-xs text-muted-foreground/70">
+              Tamanho: {(preparedPhoto.imageBlob.size / 1024 / 1024).toFixed(2)} MB
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="p-4 flex gap-3">
+          <Button
+            variant="outline"
+            size="lg"
+            className="flex-1 rounded-xl"
+            onClick={cancelPreview}
+            disabled={isSending}
+          >
+            <X className="mr-2 h-5 w-5" />
+            Descartar
+          </Button>
+          <Button
+            size="lg"
+            className="flex-1 rounded-xl capture-btn"
+            onClick={handleConfirmSend}
+            disabled={isSending}
+          >
+            {isSending ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Enviando...
+              </>
+            ) : (
+              <>
+                <Check className="mr-2 h-5 w-5" />
+                Confirmar
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen pb-24">
@@ -295,7 +430,7 @@ export default function Capture() {
             }}
           >
             <Download className="mr-2 h-4 w-4" />
-            Baixar log
+            Log
           </Button>
         </div>
       </header>
@@ -407,9 +542,9 @@ export default function Capture() {
             size="lg"
             className="w-full h-16 text-lg capture-btn rounded-2xl border-0"
             onClick={handleCaptureClick}
-            disabled={isCapturing || uploadPhoto.isPending}
+            disabled={isProcessing}
           >
-            {isCapturing || uploadPhoto.isPending ? (
+            {isProcessing ? (
               <>
                 <Loader2 className="mr-2 h-6 w-6 animate-spin" />
                 <span className="font-display">Processando...</span>
