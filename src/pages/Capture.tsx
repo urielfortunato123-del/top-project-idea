@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Camera, Clock, ChevronLeft, Loader2, Wifi, WifiOff, MapPin, Building2, FolderKanban, Wrench, FileText, Download, X, Check, RotateCcw } from 'lucide-react';
 import { drawStampOnImage } from '@/components/PhotoStamp';
+import { AutocompleteInput } from '@/components/AutocompleteInput';
 import { appLog, downloadAppLog } from '@/lib/appLog';
 import { compressImage, convertToJpeg, blobToDataUrl } from '@/lib/imageUtils';
 
@@ -464,15 +465,12 @@ export default function Capture() {
               <Building2 className="h-3.5 w-3.5" />
               Empresa
             </Label>
-            <Input
+            <AutocompleteInput
               placeholder="Digite o nome da empresa..."
               value={companyName}
-              onChange={(e) => {
-                setCompanyName(e.target.value);
-                // Try to match with existing company
-                const matched = companies.find(c => c.name.toLowerCase() === e.target.value.toLowerCase());
-                setCompanyId(matched?.id || '');
-              }}
+              onChange={(value) => setCompanyName(value)}
+              onSelect={(item) => setCompanyId(item.id)}
+              suggestions={companies.map(c => ({ id: c.id, name: c.name }))}
               className="bg-secondary/50 border-border/50 rounded-xl focus:border-primary/50"
             />
           </div>
@@ -483,15 +481,12 @@ export default function Capture() {
               <FolderKanban className="h-3.5 w-3.5" />
               Projeto/Obra
             </Label>
-            <Input
+            <AutocompleteInput
               placeholder="Digite o nome do projeto..."
               value={projectName}
-              onChange={(e) => {
-                setProjectName(e.target.value);
-                // Try to match with existing project
-                const matched = filteredProjects.find(p => p.name.toLowerCase() === e.target.value.toLowerCase());
-                setProjectId(matched?.id || '');
-              }}
+              onChange={(value) => setProjectName(value)}
+              onSelect={(item) => setProjectId(item.id)}
+              suggestions={filteredProjects.map(p => ({ id: p.id, name: p.name }))}
               className="bg-secondary/50 border-border/50 rounded-xl focus:border-primary/50"
             />
           </div>
