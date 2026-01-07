@@ -11,3 +11,11 @@ verify_jwt = false
 [functions.admin-create-user]
 enabled = true
 verify_jwt = false
+
+[functions.download-photos-zip]
+enabled = true
+verify_jwt = false
+
+[functions.generate-rdo-report]
+enabled = true
+verify_jwt = false
