@@ -230,15 +230,47 @@ const TreeNode = memo(function TreeNode({
   );
 });
 
+// Função para normalizar nomes (remover acentos e normalizar espaços)
+function normalizeForComparison(str: string): string {
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // remove acentos
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' '); // normaliza espaços
+}
+
+// Função para encontrar o melhor nome representativo de um grupo
+function findBestRepresentativeName(names: string[]): string {
+  // Retorna o nome mais comum ou o primeiro com acentuação correta
+  const countMap = new Map<string, number>();
+  names.forEach(name => {
+    countMap.set(name, (countMap.get(name) || 0) + 1);
+  });
+  
+  // Ordena por frequência e depois por comprimento (preferir nomes mais completos)
+  const sorted = Array.from(countMap.entries()).sort((a, b) => {
+    if (b[1] !== a[1]) return b[1] - a[1]; // maior frequência primeiro
+    return b[0].length - a[0].length; // nome mais longo primeiro
+  });
+  
+  return sorted[0]?.[0] || names[0];
+}
+
 export function buildUserPhotoTree(photos: PhotoRecord[], userName: string): FolderNode[] {
   if (photos.length === 0) return [];
 
-  // Agrupa por empresa
-  const byCompany = new Map<string, PhotoRecord[]>();
+  // Agrupa por empresa normalizada
+  const byCompanyNormalized = new Map<string, { photos: PhotoRecord[], names: string[] }>();
   photos.forEach(photo => {
-    const key = photo.company_name || 'Sem Empresa';
-    if (!byCompany.has(key)) byCompany.set(key, []);
-    byCompany.get(key)!.push(photo);
+    const originalName = photo.company_name || 'Sem Empresa';
+    const normalizedKey = normalizeForComparison(originalName);
+    
+    if (!byCompanyNormalized.has(normalizedKey)) {
+      byCompanyNormalized.set(normalizedKey, { photos: [], names: [] });
+    }
+    byCompanyNormalized.get(normalizedKey)!.photos.push(photo);
+    byCompanyNormalized.get(normalizedKey)!.names.push(originalName);
   });
 
   const userNode: FolderNode = {
@@ -249,26 +281,33 @@ export function buildUserPhotoTree(photos: PhotoRecord[], userName: string): Fol
     children: [],
   };
 
-  byCompany.forEach((companyPhotos, companyName) => {
+  byCompanyNormalized.forEach(({ photos: companyPhotos, names }) => {
+    const companyName = findBestRepresentativeName(names);
     const companyNode: FolderNode = {
-      id: `company-${companyName}`,
+      id: `company-${normalizeForComparison(companyName)}`,
       name: companyName,
       type: 'company',
       count: companyPhotos.length,
       children: [],
     };
 
-    // Agrupa por atividade (activity_text ou frente_servico)
-    const byActivity = new Map<string, PhotoRecord[]>();
+    // Agrupa por atividade normalizada
+    const byActivityNormalized = new Map<string, { photos: PhotoRecord[], names: string[] }>();
     companyPhotos.forEach(photo => {
-      const key = photo.activity_text || photo.frente_servico || 'Atividade Geral';
-      if (!byActivity.has(key)) byActivity.set(key, []);
-      byActivity.get(key)!.push(photo);
+      const originalName = photo.activity_text || photo.frente_servico || 'Atividade Geral';
+      const normalizedKey = normalizeForComparison(originalName);
+      
+      if (!byActivityNormalized.has(normalizedKey)) {
+        byActivityNormalized.set(normalizedKey, { photos: [], names: [] });
+      }
+      byActivityNormalized.get(normalizedKey)!.photos.push(photo);
+      byActivityNormalized.get(normalizedKey)!.names.push(originalName);
     });
 
-    byActivity.forEach((activityPhotos, activityName) => {
+    byActivityNormalized.forEach(({ photos: activityPhotos, names: activityNames }) => {
+      const activityName = findBestRepresentativeName(activityNames);
       const activityNode: FolderNode = {
-        id: `activity-${companyName}-${activityName}`,
+        id: `activity-${normalizeForComparison(companyName)}-${normalizeForComparison(activityName)}`,
         name: activityName,
         type: 'activity',
         count: activityPhotos.length,
@@ -285,7 +324,7 @@ export function buildUserPhotoTree(photos: PhotoRecord[], userName: string): Fol
 
       byTemplate.forEach((templatePhotos, templateName) => {
         const templateNode: FolderNode = {
-          id: `template-${companyName}-${activityName}-${templateName}`,
+          id: `template-${normalizeForComparison(companyName)}-${normalizeForComparison(activityName)}-${templateName}`,
           name: templateName,
           type: 'template',
           count: templatePhotos.length,
@@ -297,7 +336,6 @@ export function buildUserPhotoTree(photos: PhotoRecord[], userName: string): Fol
         templatePhotos.forEach(photo => {
           const date = new Date(photo.device_timestamp);
           const monthKey = format(date, 'yyyy-MM');
-          const monthName = format(date, 'MMMM yyyy', { locale: ptBR });
           if (!byMonth.has(monthKey)) byMonth.set(monthKey, []);
           byMonth.get(monthKey)!.push(photo);
         });
@@ -309,7 +347,7 @@ export function buildUserPhotoTree(photos: PhotoRecord[], userName: string): Fol
             const monthName = format(monthDate, 'MMMM yyyy', { locale: ptBR });
             
             const monthNode: FolderNode = {
-              id: `month-${companyName}-${activityName}-${templateName}-${monthKey}`,
+              id: `month-${normalizeForComparison(companyName)}-${normalizeForComparison(activityName)}-${templateName}-${monthKey}`,
               name: monthName.charAt(0).toUpperCase() + monthName.slice(1),
               type: 'month',
               count: monthPhotos.length,
@@ -332,7 +370,7 @@ export function buildUserPhotoTree(photos: PhotoRecord[], userName: string): Fol
                 const dayName = format(dayDate, "dd 'de' MMMM", { locale: ptBR });
                 
                 const dayNode: FolderNode = {
-                  id: `day-${companyName}-${activityName}-${templateName}-${dayKey}`,
+                  id: `day-${normalizeForComparison(companyName)}-${normalizeForComparison(activityName)}-${templateName}-${dayKey}`,
                   name: dayName,
                   type: 'day',
                   count: dayPhotos.length,

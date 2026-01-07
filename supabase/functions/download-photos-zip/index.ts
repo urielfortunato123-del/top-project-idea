@@ -80,6 +80,15 @@ serve(async (req) => {
 
     const userName = profile?.full_name || "Usuario";
     const sanitize = (str: string) => str.replace(/[^a-zA-Z0-9_\-\s]/g, "_").substring(0, 50);
+    
+    // Normaliza nomes para agrupar variações (remove acentos)
+    const normalizeForPath = (str: string) => {
+      return str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '') // remove acentos
+        .trim()
+        .replace(/\s+/g, ' '); // normaliza espaços
+    };
 
     // Fetch target user's photos
     const { data: photos, error: photosError } = await supabase
@@ -126,8 +135,8 @@ serve(async (req) => {
         const day = String(date.getDate()).padStart(2, "0");
         const time = `${String(date.getHours()).padStart(2, "0")}${String(date.getMinutes()).padStart(2, "0")}${String(date.getSeconds()).padStart(2, "0")}`;
 
-        const company = sanitize(photo.company_name || "Sem_Empresa");
-        const activity = sanitize(photo.activity_text || photo.frente_servico || "Atividade_Geral");
+        const company = sanitize(normalizeForPath(photo.company_name || "Sem_Empresa"));
+        const activity = sanitize(normalizeForPath(photo.activity_text || photo.frente_servico || "Atividade_Geral"));
         const template = sanitize((photo.templates as any)?.name || "Geral");
         const monthFolder = `${year}-${month}`;
         const dayFolder = `${day}`;
