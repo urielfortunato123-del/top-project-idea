@@ -35,8 +35,8 @@ export function PhotoStamp({
       <div 
         className="px-2 py-1 rounded"
         style={{
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          color: '#D4A017', // Dark yellow/golden color
+          backgroundColor: 'rgba(0, 0, 0, 0.35)',
+          color: '#FFD700',
           textShadow: '1px 1px 2px rgba(0, 0, 0, 0.8)',
         }}
       >
@@ -149,8 +149,8 @@ export async function drawStampOnImage(
         const boxX = padding / 2;
         const boxY = img.height - boxHeight - padding / 2;
         
-        // Draw semi-transparent background using polyfill
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        // Draw semi-transparent background using polyfill (more transparent)
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
         drawRoundedRect(ctx, boxX, boxY, boxWidth, boxHeight, fontSize * 0.3);
         ctx.fill();
         
