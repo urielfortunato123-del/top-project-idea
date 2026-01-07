@@ -38,12 +38,15 @@ export default function Capture() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: companies = [] } = useCompanies();
-  const { data: allProjects = [] } = useProjects();
+  const { data: projects = [] } = useProjects();
   const { data: templates = [] } = useTemplates();
   const { getPosition, isLoading: isGettingLocation } = useGeolocation();
   
   const savePending = useSavePendingPhoto();
   const uploadPhoto = useUploadPhoto();
+
+  const [companyId, setCompanyId] = useState<string>('');
+  const [projectId, setProjectId] = useState<string>('');
 
   const [companyName, setCompanyName] = useState<string>('');
   const [projectName, setProjectName] = useState<string>('');
@@ -54,16 +57,20 @@ export default function Capture() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
+  const selectedCompany = companies.find(c => c.id === companyId) || null;
+  const filteredProjects = projects.filter(p => !companyId || p.company_id === companyId);
+  const selectedProject = filteredProjects.find(p => p.id === projectId) || null;
+
   // Preview state
   const [preparedPhoto, setPreparedPhoto] = useState<PreparedPhoto | null>(null);
 
   const selectedTemplate = templates.find(t => t.id === templateId);
 
   const handleCaptureClick = () => {
-    if (!companyName.trim() || !projectName.trim()) {
+    if (!companyId || !projectId) {
       toast({
         title: 'Campos obrigatórios',
-        description: 'Preencha empresa e projeto antes de capturar.',
+        description: 'Selecione empresa e projeto antes de capturar.',
         variant: 'destructive',
       });
       return;
@@ -72,6 +79,8 @@ export default function Capture() {
   };
 
   const resetForm = () => {
+    setCompanyId('');
+    setProjectId('');
     setCompanyName('');
     setProjectName('');
     setFrenteServico('');
@@ -201,17 +210,17 @@ export default function Capture() {
   const saveAsPending = useCallback(async (photo: PreparedPhoto) => {
     if (!user || !profile) return;
 
-    const trimmedCompany = companyName.trim();
-    const trimmedProject = projectName.trim();
+    const trimmedCompany = (selectedCompany?.name || companyName).trim();
+    const trimmedProject = (selectedProject?.name || projectName).trim();
     const trimmedFrente = frenteServico.trim() || 'Geral';
     const trimmedActivity = activity || null;
     const selectedTemplateId = templateId || null;
 
     await savePending.mutateAsync({
       id: generateId(),
-      companyId: '',
+      companyId: companyId || '',
       companyName: trimmedCompany,
-      projectId: '',
+      projectId: projectId || '',
       projectName: trimmedProject,
       frenteServico: trimmedFrente,
       templateId: selectedTemplateId,
@@ -233,8 +242,8 @@ export default function Capture() {
     if (!preparedPhoto || !user || !profile) return;
 
     setIsSending(true);
-    const trimmedCompany = companyName.trim();
-    const trimmedProject = projectName.trim();
+    const trimmedCompany = (selectedCompany?.name || companyName).trim();
+    const trimmedProject = (selectedProject?.name || projectName).trim();
     const trimmedFrente = frenteServico.trim() || 'Geral';
     const trimmedActivity = activity || null;
     const selectedTemplateId = templateId || null;
@@ -245,8 +254,10 @@ export default function Capture() {
       if (isOnline) {
         try {
           await uploadPhoto.mutateAsync({
-            companySlug: 'manual',
+            companyId: companyId || undefined,
+            companySlug: selectedCompany?.slug || 'manual',
             companyName: trimmedCompany,
+            projectId: projectId || undefined,
             projectName: trimmedProject,
             frenteServico: trimmedFrente,
             templateId: selectedTemplateId,
@@ -451,12 +462,25 @@ export default function Capture() {
               <Building2 className="h-3.5 w-3.5" />
               Empresa
             </Label>
-            <Input
-              placeholder="Digite o nome da empresa..."
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
-              className="bg-secondary/50 border-border/50 rounded-xl focus:border-primary/50"
-            />
+            <Select
+              value={companyId || ""}
+              onValueChange={(v) => {
+                setCompanyId(v);
+                const c = companies.find(x => x.id === v);
+                setCompanyName(c?.name || '');
+                setProjectId('');
+                setProjectName('');
+              }}
+            >
+              <SelectTrigger className="bg-secondary/50 border-border/50 rounded-xl">
+                <SelectValue placeholder="Selecione a empresa" />
+              </SelectTrigger>
+              <SelectContent className="glass-card border-border/50">
+                {companies.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Project */}
@@ -465,12 +489,24 @@ export default function Capture() {
               <FolderKanban className="h-3.5 w-3.5" />
               Projeto/Obra
             </Label>
-            <Input
-              placeholder="Digite o nome do projeto..."
-              value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
-              className="bg-secondary/50 border-border/50 rounded-xl focus:border-primary/50"
-            />
+            <Select
+              value={projectId || ""}
+              onValueChange={(v) => {
+                setProjectId(v);
+                const p = filteredProjects.find(x => x.id === v);
+                setProjectName(p?.name || '');
+              }}
+              disabled={!companyId}
+            >
+              <SelectTrigger className="bg-secondary/50 border-border/50 rounded-xl">
+                <SelectValue placeholder={companyId ? "Selecione o projeto" : "Selecione a empresa primeiro"} />
+              </SelectTrigger>
+              <SelectContent className="glass-card border-border/50">
+                {filteredProjects.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Frente de Serviço */}

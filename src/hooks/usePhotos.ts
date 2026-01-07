@@ -347,15 +347,46 @@ export function useSyncPendingPhotos() {
         try {
           await updatePendingPhotoStatus(photo.id, 'uploading');
           
+          // Resolve IDs (for older pending items saved without ids)
+          let resolvedCompanyId = photo.companyId || '';
+          if (!resolvedCompanyId && photo.companyName) {
+            const { data: companyByName } = await supabase
+              .from('companies')
+              .select('id, slug')
+              .eq('name', photo.companyName)
+              .maybeSingle();
+
+            if (companyByName?.id) {
+              resolvedCompanyId = companyByName.id;
+            }
+          }
+
+          let resolvedProjectId = photo.projectId || '';
+          if (!resolvedProjectId && photo.projectName) {
+            let projectQuery = supabase
+              .from('projects')
+              .select('id')
+              .eq('name', photo.projectName);
+
+            if (resolvedCompanyId) {
+              projectQuery = projectQuery.eq('company_id', resolvedCompanyId);
+            }
+
+            const { data: projectByName } = await projectQuery.maybeSingle();
+            if (projectByName?.id) {
+              resolvedProjectId = projectByName.id;
+            }
+          }
+
           // Get company slug if companyId exists
           let companySlug = 'manual';
-          if (photo.companyId) {
+          if (resolvedCompanyId) {
             const { data: company } = await supabase
               .from('companies')
               .select('slug')
-              .eq('id', photo.companyId)
+              .eq('id', resolvedCompanyId)
               .maybeSingle();
-            
+
             if (company) {
               companySlug = company.slug;
             }
@@ -370,10 +401,10 @@ export function useSyncPendingPhotos() {
 
           // Upload triggers OCR automatically now
           await uploadPhoto.mutateAsync({
-            companyId: photo.companyId,
+            companyId: resolvedCompanyId || undefined,
             companySlug: companySlug,
             companyName: photo.companyName,
-            projectId: photo.projectId,
+            projectId: resolvedProjectId || undefined,
             projectName: photo.projectName,
             frenteServico: photo.frenteServico || '',
             templateId: photo.templateId,
