@@ -188,6 +188,15 @@ export function useUploadPhoto() {
 
   return useMutation({
     mutationFn: async (params: UploadPhotoParams) => {
+      console.log('[Upload] Iniciando upload...', { 
+        blobSize: params.imageBlob?.size,
+        blobType: params.imageBlob?.type 
+      });
+
+      if (!params.imageBlob || params.imageBlob.size === 0) {
+        throw new Error('Imagem inválida ou vazia. Tente novamente.');
+      }
+
       const timestamp = format(params.deviceTimestamp, 'yyyyMMdd_HHmmss');
       const ms = params.deviceTimestamp.getMilliseconds().toString().padStart(3, '0');
       const nonce = Math.random().toString(36).slice(2, 8);
@@ -204,6 +213,8 @@ export function useUploadPhoto() {
       // Add ms+nonce to avoid collisions when taking multiple photos quickly.
       const filePath = `${companyFolder}/${projectFolder}/${frenteFolder}/${monthFolder}/${dayFolder}/IMG_${timestamp}_${ms}_${nonce}.jpg`;
       
+      console.log('[Upload] Enviando para storage:', filePath);
+
       // Upload to storage
       const { error: uploadError } = await supabase.storage
         .from('photos')
@@ -212,12 +223,19 @@ export function useUploadPhoto() {
           upsert: false,
         });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('[Upload] Erro no storage:', uploadError);
+        throw new Error(`Falha no envio: ${uploadError.message}`);
+      }
+
+      console.log('[Upload] Storage OK, obtendo URL...');
 
       // Get public URL
       const { data: urlData } = supabase.storage
         .from('photos')
         .getPublicUrl(filePath);
+
+      console.log('[Upload] Inserindo registro no banco...');
 
       // Insert record
       const { data, error } = await supabase
@@ -243,7 +261,12 @@ export function useUploadPhoto() {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('[Upload] Erro no banco:', error);
+        throw new Error(`Falha ao salvar registro: ${error.message}`);
+      }
+      
+      console.log('[Upload] Sucesso! ID:', data.id);
       
       // Trigger OCR processing automatically (fire and forget)
       triggerOCRProcessing(data.id, urlData.publicUrl, params.templateId);

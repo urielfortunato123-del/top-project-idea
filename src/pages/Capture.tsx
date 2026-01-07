@@ -126,23 +126,41 @@ export default function Capture() {
     const selectedTemplateId = templateId || null;
 
     try {
-      // Alguns celulares fracos podem travar se lermos o arquivo inteiro na memória.
-      // Então evitamos file.arrayBuffer() aqui.
-      const position = await getPosition().catch(() => null);
+      console.log('[Capture] Iniciando captura...', { 
+        fileType: file.type, 
+        fileSize: file.size, 
+        fileName: file.name 
+      });
 
-      // Garantir JPEG (o upload usa contentType image/jpeg e extensão .jpg)
+      const position = await getPosition().catch((err) => {
+        console.log('[Capture] GPS não disponível:', err);
+        return null;
+      });
+
+      // Garantir JPEG - file.type pode ser vazio em alguns navegadores móveis
       let imageBlob: Blob = file;
+      const fileType = file.type?.toLowerCase() || '';
 
-      if (file.type && file.type !== 'image/jpeg') {
-        // HEIC/HEIF costuma falhar em WebViews mais antigos
-        if (/image\/(heic|heif)/i.test(file.type)) {
-          throw new Error('Formato de imagem (HEIC) não suportado neste aparelho. Ative "Salvar como JPG" na câmera ou use outro modo.');
+      // HEIC/HEIF não é suportado em muitos WebViews
+      if (fileType.includes('heic') || fileType.includes('heif')) {
+        throw new Error('Formato HEIC não suportado. Configure a câmera para salvar fotos em JPG.');
+      }
+
+      // Se não for JPEG ou tipo desconhecido, converter para JPEG
+      if (fileType !== 'image/jpeg' && fileType !== 'image/jpg') {
+        console.log('[Capture] Convertendo para JPEG...');
+        try {
+          imageBlob = await convertToJpeg(file);
+          console.log('[Capture] Conversão OK, novo tamanho:', imageBlob.size);
+        } catch (convErr) {
+          console.error('[Capture] Erro na conversão:', convErr);
+          // Se a conversão falhar, tentar usar o arquivo original
+          imageBlob = file;
         }
-
-        imageBlob = await convertToJpeg(file);
       }
 
       if (showStamp) {
+        console.log('[Capture] Aplicando carimbo...');
         try {
           imageBlob = await drawStampOnImage(imageBlob, {
             timestamp: deviceTimestamp,
@@ -153,10 +171,14 @@ export default function Capture() {
             companyName: trimmedCompany,
             frenteServico: trimmedFrente,
           });
+          console.log('[Capture] Carimbo aplicado, tamanho final:', imageBlob.size);
         } catch (stampError) {
-          console.error('Error applying stamp:', stampError);
+          console.error('[Capture] Erro ao aplicar carimbo:', stampError);
+          // Continuar sem o carimbo se falhar
         }
       }
+
+      console.log('[Capture] Enviando foto, isOnline:', isOnline);
 
       if (isOnline) {
         await uploadPhoto.mutateAsync({
@@ -207,12 +229,17 @@ export default function Capture() {
         });
       }
 
+      console.log('[Capture] Sucesso!');
       resetForm();
     } catch (error) {
-      console.error('[Capture] Erro na captura:', error);
+      console.error('[Capture] ERRO COMPLETO:', error);
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : String(error) || 'Não foi possível processar a foto.';
+      
       toast({
         title: 'Erro na captura',
-        description: error instanceof Error ? error.message : 'Não foi possível processar a foto.',
+        description: errorMessage,
         variant: 'destructive',
       });
       if (fileInputRef.current) {
