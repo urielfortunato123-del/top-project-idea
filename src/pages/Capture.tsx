@@ -52,6 +52,7 @@ export default function Capture() {
   const [projectName, setProjectName] = useState<string>('');
   const [frenteServico, setFrenteServico] = useState<string>('');
   const [templateId, setTemplateId] = useState<string>('');
+  const [customTemplateName, setCustomTemplateName] = useState<string>('');
   const [activity, setActivity] = useState<string>('');
   const [showStamp, setShowStamp] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -67,10 +68,10 @@ export default function Capture() {
   const selectedTemplate = templates.find(t => t.id === templateId);
 
   const handleCaptureClick = () => {
-    if (!companyId || !projectId) {
+    if (!companyName.trim() || !projectId) {
       toast({
         title: 'Campos obrigatórios',
-        description: 'Selecione empresa e projeto antes de capturar.',
+        description: 'Preencha empresa e selecione projeto antes de capturar.',
         variant: 'destructive',
       });
       return;
@@ -85,6 +86,7 @@ export default function Capture() {
     setProjectName('');
     setFrenteServico('');
     setTemplateId('');
+    setCustomTemplateName('');
     setActivity('');
     setPreparedPhoto(null);
     if (fileInputRef.current) {
@@ -462,25 +464,17 @@ export default function Capture() {
               <Building2 className="h-3.5 w-3.5" />
               Empresa
             </Label>
-            <Select
-              value={companyId || ""}
-              onValueChange={(v) => {
-                setCompanyId(v);
-                const c = companies.find(x => x.id === v);
-                setCompanyName(c?.name || '');
-                setProjectId('');
-                setProjectName('');
+            <Input
+              placeholder="Digite o nome da empresa..."
+              value={companyName}
+              onChange={(e) => {
+                setCompanyName(e.target.value);
+                // Try to match with existing company
+                const matched = companies.find(c => c.name.toLowerCase() === e.target.value.toLowerCase());
+                setCompanyId(matched?.id || '');
               }}
-            >
-              <SelectTrigger className="bg-secondary/50 border-border/50 rounded-xl">
-                <SelectValue placeholder="Selecione a empresa" />
-              </SelectTrigger>
-              <SelectContent className="glass-card border-border/50">
-                {companies.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              className="bg-secondary/50 border-border/50 rounded-xl focus:border-primary/50"
+            />
           </div>
 
           {/* Project */}
@@ -529,7 +523,12 @@ export default function Capture() {
               <FileText className="h-3.5 w-3.5" />
               Template (opcional)
             </Label>
-            <Select value={templateId} onValueChange={(v) => setTemplateId(v === "auto" ? "" : v)}>
+            <Select value={templateId} onValueChange={(v) => {
+              setTemplateId(v === "auto" ? "" : v);
+              if (v !== "custom") {
+                setCustomTemplateName('');
+              }
+            }}>
               <SelectTrigger className="bg-secondary/50 border-border/50 rounded-xl">
                 <SelectValue placeholder="Automático" />
               </SelectTrigger>
@@ -540,8 +539,17 @@ export default function Capture() {
                     {template.icon} {template.name}
                   </SelectItem>
                 ))}
+                <SelectItem value="custom">✏️ Personalizado</SelectItem>
               </SelectContent>
             </Select>
+            {templateId === "custom" && (
+              <Input
+                placeholder="Digite o nome do template..."
+                value={customTemplateName}
+                onChange={(e) => setCustomTemplateName(e.target.value)}
+                className="bg-secondary/50 border-border/50 rounded-xl focus:border-primary/50 mt-2"
+              />
+            )}
           </div>
 
           {/* Activity */}
