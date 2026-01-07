@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => ({
     react(),
     mode === "development" && componentTagger(),
     VitePWA({
-      registerType: "autoUpdate",
+      registerType: "prompt",
       includeAssets: ["favicon.ico", "robots.txt"],
       manifest: {
         name: "ObraPhoto Mobile",
@@ -22,8 +22,8 @@ export default defineConfig(({ mode }) => ({
         description: "Registro Técnico de Campo - Capture, organize e sincronize fotos de obras",
         start_url: "/",
         display: "standalone",
-        background_color: "#f5f7fa",
-        theme_color: "#f97316",
+        background_color: "#0a0a0f",
+        theme_color: "#3b82f6",
         orientation: "portrait-primary",
         icons: [
           {
@@ -48,6 +48,8 @@ export default defineConfig(({ mode }) => ({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        skipWaiting: false,
+        clientsClaim: true,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
