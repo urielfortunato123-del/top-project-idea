@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompanies, useProjects, useTemplates } from '@/hooks/useProjects';
 import { BottomNav } from '@/components/BottomNav';
@@ -44,8 +44,7 @@ export default function Admin() {
   }
 
   if (!user) {
-    navigate('/auth');
-    return null;
+    return <Navigate to="/" replace />;
   }
 
   if (!isAdmin) {
