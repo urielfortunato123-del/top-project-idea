@@ -31,7 +31,7 @@ export function PhotoStamp({
     : 'GPS indisponível';
 
   return (
-    <div className="absolute bottom-2 right-2 text-right font-mono text-xs leading-tight pointer-events-none select-none">
+    <div className="absolute bottom-2 right-2 text-right font-mono leading-tight pointer-events-none select-none origin-bottom-right scale-[0.7]">
       <div 
         className="px-2 py-1 rounded"
         style={{
@@ -40,12 +40,12 @@ export function PhotoStamp({
           textShadow: '1px 1px 2px rgba(0, 0, 0, 0.8)',
         }}
       >
-        <div className="font-bold">{formattedDate} {formattedTime}</div>
-        <div>{coordsText}</div>
-        {userName && <div>{userName}</div>}
-        {projectName && <div>{projectName}</div>}
-        {frenteServico && <div>{frenteServico}</div>}
-        {companyName && <div className="text-[10px] opacity-80">{companyName}</div>}
+        <div className="text-[11px] font-bold">📅 {formattedDate} {formattedTime}</div>
+        <div className="text-[11px]">📍 {coordsText}</div>
+        {companyName && <div className="text-[11px]">🏢 {companyName}</div>}
+        {projectName && <div className="text-[11px]">📁 {projectName}</div>}
+        {frenteServico && <div className="text-[11px]">🔧 {frenteServico}</div>}
+        {userName && <div className="text-[11px]">👤 {userName}</div>}
       </div>
     </div>
   );
@@ -124,22 +124,22 @@ export async function drawStampOnImage(
           : 'GPS indisponível';
         
         const lines: string[] = [];
-        
-        // Add company and project first (more prominent)
-        if (stampData.companyName) lines.push(`${stampData.companyName}`);
-        if (stampData.projectName) lines.push(`${stampData.projectName}`);
-        if (stampData.frenteServico) lines.push(`${stampData.frenteServico}`);
-        if (stampData.userName) lines.push(`${stampData.userName}`);
-        lines.push(`${formattedDate}`);
-        lines.push(`${coordsText}`);
-        
-        // Calculate font size based on image size (responsive)
-        const fontSize = Math.max(Math.floor(img.width / 30), 16);
+
+        // Add with small icons like the on-screen stamp
+        if (stampData.companyName) lines.push(`🏢 ${stampData.companyName}`);
+        if (stampData.projectName) lines.push(`📁 ${stampData.projectName}`);
+        if (stampData.frenteServico) lines.push(`🔧 ${stampData.frenteServico}`);
+        if (stampData.userName) lines.push(`👤 ${stampData.userName}`);
+        lines.push(`📅 ${formattedDate}`);
+        lines.push(`📍 ${coordsText}`);
+
+        // Calculate font size based on image size (responsive) - reduce ~30%
+        const fontSize = Math.max(Math.floor((img.width / 30) * 0.7), 12);
         const lineHeight = fontSize * 1.4;
         const padding = fontSize;
-        
+
         ctx.font = `bold ${fontSize}px Arial, sans-serif`;
-        
+
         // Calculate text width for background
         const maxWidth = Math.max(...lines.map(line => ctx.measureText(line).width));
         const boxWidth = maxWidth + padding * 2;

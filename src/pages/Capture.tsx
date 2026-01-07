@@ -12,8 +12,9 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Camera, Clock, ChevronLeft, Loader2, Wifi, WifiOff, MapPin, Building2, FolderKanban, Wrench, FileText } from 'lucide-react';
+import { Camera, Clock, ChevronLeft, Loader2, Wifi, WifiOff, MapPin, Building2, FolderKanban, Wrench, FileText, Download } from 'lucide-react';
 import { drawStampOnImage } from '@/components/PhotoStamp';
+import { appLog, downloadAppLog } from '@/lib/appLog';
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
@@ -126,14 +127,15 @@ export default function Capture() {
     const selectedTemplateId = templateId || null;
 
     try {
-      console.log('[Capture] Iniciando captura...', { 
-        fileType: file.type, 
-        fileSize: file.size, 
-        fileName: file.name 
+      appLog.info('[Capture] Iniciando captura', {
+        fileType: file.type,
+        fileSize: file.size,
+        fileName: file.name,
+        ua: navigator.userAgent,
       });
 
       const position = await getPosition().catch((err) => {
-        console.log('[Capture] GPS não disponível:', err);
+        appLog.warn('[Capture] GPS não disponível', err);
         return null;
       });
 
@@ -148,19 +150,19 @@ export default function Capture() {
 
       // Se não for JPEG ou tipo desconhecido, converter para JPEG
       if (fileType !== 'image/jpeg' && fileType !== 'image/jpg') {
-        console.log('[Capture] Convertendo para JPEG...');
+        appLog.info('[Capture] Convertendo para JPEG...');
         try {
           imageBlob = await convertToJpeg(file);
-          console.log('[Capture] Conversão OK, novo tamanho:', imageBlob.size);
+          appLog.info('[Capture] Conversão OK', { newSize: imageBlob.size, type: imageBlob.type });
         } catch (convErr) {
-          console.error('[Capture] Erro na conversão:', convErr);
+          appLog.error('[Capture] Erro na conversão', convErr);
           // Se a conversão falhar, tentar usar o arquivo original
           imageBlob = file;
         }
       }
 
       if (showStamp) {
-        console.log('[Capture] Aplicando carimbo...');
+        appLog.info('[Capture] Aplicando carimbo...');
         try {
           imageBlob = await drawStampOnImage(imageBlob, {
             timestamp: deviceTimestamp,
@@ -171,14 +173,14 @@ export default function Capture() {
             companyName: trimmedCompany,
             frenteServico: trimmedFrente,
           });
-          console.log('[Capture] Carimbo aplicado, tamanho final:', imageBlob.size);
+          appLog.info('[Capture] Carimbo aplicado', { finalSize: imageBlob.size });
         } catch (stampError) {
-          console.error('[Capture] Erro ao aplicar carimbo:', stampError);
+          appLog.error('[Capture] Erro ao aplicar carimbo', stampError);
           // Continuar sem o carimbo se falhar
         }
       }
 
-      console.log('[Capture] Enviando foto, isOnline:', isOnline);
+      appLog.info('[Capture] Enviando foto', { isOnline });
 
       if (isOnline) {
         await uploadPhoto.mutateAsync({
@@ -229,14 +231,15 @@ export default function Capture() {
         });
       }
 
-      console.log('[Capture] Sucesso!');
+      appLog.info('[Capture] Sucesso!');
       resetForm();
     } catch (error) {
-      console.error('[Capture] ERRO COMPLETO:', error);
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : String(error) || 'Não foi possível processar a foto.';
-      
+      appLog.error('[Capture] ERRO COMPLETO', error);
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : String(error) || 'Não foi possível processar a foto.';
+
       toast({
         title: 'Erro na captura',
         description: errorMessage,
@@ -281,6 +284,19 @@ export default function Capture() {
               </div>
             </div>
           </div>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className="rounded-xl hover:bg-secondary/50"
+            onClick={() => {
+              appLog.info('[Log] Download solicitado');
+              downloadAppLog();
+            }}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Baixar log
+          </Button>
         </div>
       </header>
 
