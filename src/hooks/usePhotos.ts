@@ -248,7 +248,7 @@ export function useUploadPhoto() {
           project_name: params.projectName,
           frente_servico: params.frenteServico || null,
           user_id: params.userId,
-          template_id: params.templateId,
+          template_id: params.templateId && params.templateId !== 'custom' ? params.templateId : null,
           activity_text: params.activityText || null,
           device_timestamp: params.deviceTimestamp.toISOString(),
           latitude: params.latitude,
