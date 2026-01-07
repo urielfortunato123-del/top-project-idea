@@ -7,8 +7,10 @@ import { PhotoCard } from '@/components/PhotoCard';
 import { FolderTreeView, buildUserPhotoTree } from '@/components/FolderTreeView';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ChevronLeft, Camera, Images, Loader2, Grid3X3, FolderTree, Search, X } from 'lucide-react';
+import { ChevronLeft, Camera, Images, Loader2, Grid3X3, FolderTree, Search, X, Download } from 'lucide-react';
 import { format } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 type ViewMode = 'grid' | 'tree';
 
@@ -18,6 +20,53 @@ export default function Photos() {
   const { profile } = useAuth();
   const [viewMode, setViewMode] = useState<ViewMode>('tree');
   const [searchTerm, setSearchTerm] = useState('');
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownloadZip = async () => {
+    try {
+      setIsDownloading(true);
+      toast.info('Preparando download...', { duration: 3000 });
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Você precisa estar logado');
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/download-photos-zip`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erro ao gerar ZIP');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `fotos_${format(new Date(), 'yyyy-MM-dd')}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast.success('Download concluído!');
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error(error instanceof Error ? error.message : 'Erro ao baixar fotos');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   // Filter photos based on search term
   const filteredPhotos = useMemo(() => {
@@ -64,25 +113,44 @@ export default function Photos() {
             
             {/* View Toggle */}
             {photos.length > 0 && (
-              <div className="flex gap-1 bg-muted/50 rounded-lg p-1">
+              <div className="flex gap-1">
+                {/* Download Button */}
                 <Button
-                  variant={viewMode === 'tree' ? 'secondary' : 'ghost'}
+                  variant="ghost"
                   size="icon"
                   className="h-8 w-8"
-                  onClick={() => setViewMode('tree')}
-                  title="Visualização em pastas"
+                  onClick={handleDownloadZip}
+                  disabled={isDownloading}
+                  title="Baixar todas as fotos em ZIP"
                 >
-                  <FolderTree className="h-4 w-4" />
+                  {isDownloading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
                 </Button>
-                <Button
-                  variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setViewMode('grid')}
-                  title="Visualização em grade"
-                >
-                  <Grid3X3 className="h-4 w-4" />
-                </Button>
+                
+                {/* View Toggle */}
+                <div className="flex gap-1 bg-muted/50 rounded-lg p-1">
+                  <Button
+                    variant={viewMode === 'tree' ? 'secondary' : 'ghost'}
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setViewMode('tree')}
+                    title="Visualização em pastas"
+                  >
+                    <FolderTree className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setViewMode('grid')}
+                    title="Visualização em grade"
+                  >
+                    <Grid3X3 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             )}
           </div>

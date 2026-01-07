@@ -17,6 +17,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import PhotoBrowser from "./pages/PhotoBrowser";
 import PhotoMap from "./pages/PhotoMap";
 import Reports from "./pages/Reports";
+import RDOPage from "./pages/RDOPage";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -86,6 +87,7 @@ function AppRoutes() {
       <Route path="/photo-browser" element={<AdminRoute><PhotoBrowser /></AdminRoute>} />
       <Route path="/photo-map" element={<ProtectedRoute><PhotoMap /></ProtectedRoute>} />
       <Route path="/reports" element={<AdminRoute><Reports /></AdminRoute>} />
+      <Route path="/rdo" element={<ProtectedRoute><RDOPage /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
