@@ -5,33 +5,50 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { UpdatePrompt } from "@/components/UpdatePrompt";
-import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
-import Capture from "./pages/Capture";
-import Pending from "./pages/Pending";
-import Photos from "./pages/Photos";
-import PhotoDetail from "./pages/PhotoDetail";
-import Profile from "./pages/Profile";
-import Admin from "./pages/Admin";
-import AdminDashboard from "./pages/AdminDashboard";
-import PhotoBrowser from "./pages/PhotoBrowser";
-import PhotoMap from "./pages/PhotoMap";
-import Reports from "./pages/Reports";
-import RDOPage from "./pages/RDOPage";
-import NotFound from "./pages/NotFound";
+import { Suspense, lazy, memo } from "react";
 import { Loader2 } from "lucide-react";
 
-const queryClient = new QueryClient();
+// Lazy load all pages for better initial load performance
+const Auth = lazy(() => import("./pages/Auth"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Capture = lazy(() => import("./pages/Capture"));
+const Pending = lazy(() => import("./pages/Pending"));
+const Photos = lazy(() => import("./pages/Photos"));
+const PhotoDetail = lazy(() => import("./pages/PhotoDetail"));
+const Profile = lazy(() => import("./pages/Profile"));
+const Admin = lazy(() => import("./pages/Admin"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
+const PhotoBrowser = lazy(() => import("./pages/PhotoBrowser"));
+const PhotoMap = lazy(() => import("./pages/PhotoMap"));
+const Reports = lazy(() => import("./pages/Reports"));
+const RDOPage = lazy(() => import("./pages/RDOPage"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+// Optimized QueryClient for low-end devices
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      gcTime: 1000 * 60 * 10, // 10 minutes (formerly cacheTime)
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
+
+// Loading fallback component
+const PageLoader = memo(() => (
+  <div className="min-h-screen flex items-center justify-center bg-background">
+    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+  </div>
+));
+PageLoader.displayName = 'PageLoader';
+
+const ProtectedRoute = memo(({ children }: { children: React.ReactNode }) => {
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <PageLoader />;
   }
 
   if (!user) {
@@ -39,17 +56,14 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   return <>{children}</>;
-}
+});
+ProtectedRoute.displayName = 'ProtectedRoute';
 
-function AdminRoute({ children }: { children: React.ReactNode }) {
+const AdminRoute = memo(({ children }: { children: React.ReactNode }) => {
   const { user, isAdmin, isLoading, role } = useAuth();
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <PageLoader />;
   }
 
   if (!user) {
@@ -58,11 +72,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 
   // Wait role hydration to avoid redirecting an admin before role arrives
   if (role === null) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <PageLoader />;
   }
 
   if (!isAdmin) {
@@ -70,32 +80,35 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   }
 
   return <>{children}</>;
-}
+});
+AdminRoute.displayName = 'AdminRoute';
 
 function AppRoutes() {
   return (
-    <Routes>
-      <Route path="/" element={<Auth />} />
-      <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-      <Route path="/capture" element={<ProtectedRoute><Capture /></ProtectedRoute>} />
-      <Route path="/pending" element={<ProtectedRoute><Pending /></ProtectedRoute>} />
-      <Route path="/photos" element={<ProtectedRoute><Photos /></ProtectedRoute>} />
-      <Route path="/photos/:id" element={<ProtectedRoute><PhotoDetail /></ProtectedRoute>} />
-      <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-      <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
-      <Route path="/admin-dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
-      <Route path="/photo-browser" element={<AdminRoute><PhotoBrowser /></AdminRoute>} />
-      <Route path="/photo-map" element={<ProtectedRoute><PhotoMap /></ProtectedRoute>} />
-      <Route path="/reports" element={<AdminRoute><Reports /></AdminRoute>} />
-      <Route path="/rdo" element={<ProtectedRoute><RDOPage /></ProtectedRoute>} />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+        <Route path="/" element={<Auth />} />
+        <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/capture" element={<ProtectedRoute><Capture /></ProtectedRoute>} />
+        <Route path="/pending" element={<ProtectedRoute><Pending /></ProtectedRoute>} />
+        <Route path="/photos" element={<ProtectedRoute><Photos /></ProtectedRoute>} />
+        <Route path="/photos/:id" element={<ProtectedRoute><PhotoDetail /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+        <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
+        <Route path="/admin-dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+        <Route path="/photo-browser" element={<AdminRoute><PhotoBrowser /></AdminRoute>} />
+        <Route path="/photo-map" element={<ProtectedRoute><PhotoMap /></ProtectedRoute>} />
+        <Route path="/reports" element={<AdminRoute><Reports /></AdminRoute>} />
+        <Route path="/rdo" element={<ProtectedRoute><RDOPage /></ProtectedRoute>} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Suspense>
   );
 }
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
+    <TooltipProvider delayDuration={300}>
       <Toaster />
       <Sonner />
       <BrowserRouter>

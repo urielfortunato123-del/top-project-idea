@@ -27,10 +27,14 @@
     <link rel="apple-touch-icon" href="/pwa-192x192.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/pwa-192x192.png" />
     
-    <!-- Modern Fonts -->
+    <!-- Modern Fonts - Optimized loading -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    
+    <!-- Performance optimizations -->
+    <link rel="dns-prefetch" href="https://eiasfrsmacyhkmfbtfhq.supabase.co">
+    <meta http-equiv="x-dns-prefetch-control" content="on">
   </head>
 
   <body>

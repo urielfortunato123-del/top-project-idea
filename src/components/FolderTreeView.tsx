@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo, useCallback } from 'react';
 import { 
   ChevronRight, 
   ChevronDown, 
@@ -14,7 +14,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -66,7 +66,7 @@ const getIcon = (type: FolderNode['type'], isExpanded: boolean) => {
   }
 };
 
-function TreeNode({ 
+const TreeNode = memo(function TreeNode({ 
   node, 
   level = 0, 
   onPhotoClick,
@@ -228,7 +228,7 @@ function TreeNode({
       )}
     </div>
   );
-}
+});
 
 export function buildUserPhotoTree(photos: PhotoRecord[], userName: string): FolderNode[] {
   if (photos.length === 0) return [];
@@ -365,16 +365,16 @@ export function buildUserPhotoTree(photos: PhotoRecord[], userName: string): Fol
   return [userNode];
 }
 
-export function FolderTreeView({ nodes, onPhotoClick, onPhotoDeleted }: FolderTreeViewProps) {
+export const FolderTreeView = memo(function FolderTreeView({ nodes, onPhotoClick, onPhotoDeleted }: FolderTreeViewProps) {
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoRecord | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const queryClient = useQueryClient();
   
-  const handlePhotoClick = (photo: PhotoRecord) => {
+  const handlePhotoClick = useCallback((photo: PhotoRecord) => {
     setSelectedPhoto(photo);
     onPhotoClick?.(photo);
-  };
+  }, [onPhotoClick]);
 
   const handleDeleteSelectedPhoto = async () => {
     if (!selectedPhoto) return;
@@ -524,4 +524,4 @@ export function FolderTreeView({ nodes, onPhotoClick, onPhotoDeleted }: FolderTr
       </AlertDialog>
     </>
   );
-}
+});
