@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
+import { appLog } from '@/lib/appLog';
 import { 
   addPendingPhoto, 
   getPendingPhotos, 
@@ -188,9 +189,9 @@ export function useUploadPhoto() {
 
   return useMutation({
     mutationFn: async (params: UploadPhotoParams) => {
-      console.log('[Upload] Iniciando upload...', { 
+      appLog.info('[Upload] Iniciando upload', {
         blobSize: params.imageBlob?.size,
-        blobType: params.imageBlob?.type 
+        blobType: params.imageBlob?.type,
       });
 
       if (!params.imageBlob || params.imageBlob.size === 0) {
@@ -213,7 +214,7 @@ export function useUploadPhoto() {
       // Add ms+nonce to avoid collisions when taking multiple photos quickly.
       const filePath = `${companyFolder}/${projectFolder}/${frenteFolder}/${monthFolder}/${dayFolder}/IMG_${timestamp}_${ms}_${nonce}.jpg`;
       
-      console.log('[Upload] Enviando para storage:', filePath);
+      appLog.info('[Upload] Enviando para storage', { filePath });
 
       // Upload to storage
       const { error: uploadError } = await supabase.storage
@@ -224,18 +225,18 @@ export function useUploadPhoto() {
         });
 
       if (uploadError) {
-        console.error('[Upload] Erro no storage:', uploadError);
+        appLog.error('[Upload] Erro no storage', uploadError);
         throw new Error(`Falha no envio: ${uploadError.message}`);
       }
 
-      console.log('[Upload] Storage OK, obtendo URL...');
+      appLog.info('[Upload] Storage OK, obtendo URL...');
 
       // Get public URL
       const { data: urlData } = supabase.storage
         .from('photos')
         .getPublicUrl(filePath);
 
-      console.log('[Upload] Inserindo registro no banco...');
+      appLog.info('[Upload] Inserindo registro no banco...');
 
       // Insert record
       const { data, error } = await supabase
@@ -262,11 +263,11 @@ export function useUploadPhoto() {
         .single();
 
       if (error) {
-        console.error('[Upload] Erro no banco:', error);
+        appLog.error('[Upload] Erro no banco', error);
         throw new Error(`Falha ao salvar registro: ${error.message}`);
       }
       
-      console.log('[Upload] Sucesso! ID:', data.id);
+      appLog.info('[Upload] Sucesso', { id: data.id });
       
       // Trigger OCR processing automatically (fire and forget)
       triggerOCRProcessing(data.id, urlData.publicUrl, params.templateId);
