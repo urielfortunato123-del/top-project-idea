@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompanies, useProjects, useTemplates } from '@/hooks/useProjects';
@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { ChevronLeft, Building2, FolderOpen, FileText, Plus, Loader2, Users, Trash2, Pencil, Download } from 'lucide-react';
+import { ChevronLeft, Building2, FolderOpen, FileText, Plus, Loader2, Users, Trash2, Pencil, Download, Upload } from 'lucide-react';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -61,6 +61,9 @@ export default function Admin() {
   const [deletingUser, setDeletingUser] = useState<UserWithRole | null>(null);
   const [isDeletingUser, setIsDeletingUser] = useState(false);
   const [downloadingUserId, setDownloadingUserId] = useState<string | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const companyFileInputRef = useRef<HTMLInputElement>(null);
+  const serviceFileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch users with roles
   const { data: users = [], isLoading: isLoadingUsers } = useQuery({
@@ -391,6 +394,63 @@ export default function Admin() {
     }
   };
 
+  const handleImportFile = async (file: File, type: 'companies' | 'services') => {
+    setIsImporting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({ title: 'Erro', description: 'Você precisa estar logado', variant: 'destructive' });
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('type', type);
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/import-list`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: formData,
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao importar');
+      }
+
+      toast({
+        title: 'Importação concluída!',
+        description: `${result.imported} importados, ${result.skipped} já existentes`,
+      });
+
+      // Refresh data
+      if (type === 'companies') {
+        queryClient.invalidateQueries({ queryKey: ['companies'] });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['templates'] });
+      }
+
+      if (result.errors?.length > 0) {
+        console.warn('Import errors:', result.errors);
+      }
+    } catch (error) {
+      console.error('Import error:', error);
+      toast({
+        title: 'Erro ao importar',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background pb-24">
       {/* Header */}
@@ -543,6 +603,47 @@ export default function Admin() {
 
           {/* Companies Tab */}
           <TabsContent value="companies" className="space-y-4">
+            {/* Import Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Upload className="h-4 w-4" />
+                  Importar Lista de Empresas
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Importe uma lista de empresas de um arquivo CSV, TXT ou Excel (.xlsx).
+                  Uma empresa por linha.
+                </p>
+                <input
+                  ref={companyFileInputRef}
+                  type="file"
+                  accept=".csv,.txt,.xlsx,.xls"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      handleImportFile(file, 'companies');
+                      e.target.value = '';
+                    }
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => companyFileInputRef.current?.click()}
+                  disabled={isImporting}
+                >
+                  {isImporting ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Upload className="h-4 w-4 mr-2" />
+                  )}
+                  Selecionar Arquivo
+                </Button>
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Nova Empresa</CardTitle>
@@ -653,6 +754,47 @@ export default function Admin() {
 
           {/* Templates Tab */}
           <TabsContent value="templates" className="space-y-4">
+            {/* Import Services Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Upload className="h-4 w-4" />
+                  Importar Lista de Serviços
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Importe uma lista de serviços/atividades de um arquivo CSV, TXT ou Excel (.xlsx).
+                  Um serviço por linha.
+                </p>
+                <input
+                  ref={serviceFileInputRef}
+                  type="file"
+                  accept=".csv,.txt,.xlsx,.xls"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      handleImportFile(file, 'services');
+                      e.target.value = '';
+                    }
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => serviceFileInputRef.current?.click()}
+                  disabled={isImporting}
+                >
+                  {isImporting ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Upload className="h-4 w-4 mr-2" />
+                  )}
+                  Selecionar Arquivo
+                </Button>
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Novo Template</CardTitle>
