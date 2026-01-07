@@ -82,10 +82,17 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    background-image: 
-      radial-gradient(ellipse 80% 50% at 50% -20%, hsl(217 91% 60% / 0.15), transparent),
-      radial-gradient(ellipse 60% 40% at 100% 100%, hsl(189 94% 43% / 0.1), transparent);
-    background-attachment: fixed;
+    /* Simplified gradient for better performance on low-end devices */
+    background-color: hsl(240 10% 4%);
+  }
+
+  /* Enable gradient only on high-performance devices */
+  @media (prefers-reduced-motion: no-preference) and (min-width: 768px) {
+    body {
+      background-image: 
+        radial-gradient(ellipse 80% 50% at 50% -20%, hsl(217 91% 60% / 0.1), transparent);
+      background-attachment: fixed;
+    }
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -94,24 +101,39 @@
 }
 
 @layer components {
-  /* Glassmorphism Card */
+  /* Glassmorphism Card - Optimized for low-end devices */
   .glass-card {
     @apply relative overflow-hidden;
-    background: hsl(var(--glass-bg));
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
+    background: hsl(240 10% 10% / 0.8);
     border: 1px solid hsl(var(--glass-border));
-    box-shadow: var(--shadow-glass);
   }
 
-  .glass-card::before {
-    content: '';
-    @apply absolute inset-0 pointer-events-none;
-    background: linear-gradient(
-      135deg,
-      hsl(0 0% 100% / 0.08) 0%,
-      transparent 50%
-    );
+  /* Enable blur only on devices that can handle it */
+  @supports (backdrop-filter: blur(10px)) {
+    @media (prefers-reduced-motion: no-preference) {
+      .glass-card {
+        background: hsl(var(--glass-bg));
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+      }
+    }
+  }
+
+  /* Glass Header - Optimized */
+  .glass-header {
+    @apply sticky top-0 z-40;
+    background: hsl(240 10% 8% / 0.95);
+    border-bottom: 1px solid hsl(var(--glass-border));
+  }
+
+  @supports (backdrop-filter: blur(10px)) {
+    @media (prefers-reduced-motion: no-preference) {
+      .glass-header {
+        background: hsl(var(--glass-bg));
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+      }
+    }
   }
 
   /* Glass Header */
@@ -123,13 +145,21 @@
     border-bottom: 1px solid hsl(var(--glass-border));
   }
 
-  /* Glass Nav */
+  /* Glass Nav - Optimized */
   .glass-nav {
     @apply fixed bottom-0 left-0 right-0 z-50;
-    background: hsl(var(--glass-bg));
-    backdrop-filter: blur(24px) saturate(180%);
-    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    background: hsl(240 10% 8% / 0.95);
     border-top: 1px solid hsl(var(--glass-border));
+  }
+
+  @supports (backdrop-filter: blur(10px)) {
+    @media (prefers-reduced-motion: no-preference) {
+      .glass-nav {
+        background: hsl(var(--glass-bg));
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+      }
+    }
   }
 
   /* Status Badges */
