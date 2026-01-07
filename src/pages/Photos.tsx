@@ -6,7 +6,9 @@ import { BottomNav } from '@/components/BottomNav';
 import { PhotoCard } from '@/components/PhotoCard';
 import { FolderTreeView, buildUserPhotoTree } from '@/components/FolderTreeView';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, Camera, Images, Loader2, Grid3X3, FolderTree } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { ChevronLeft, Camera, Images, Loader2, Grid3X3, FolderTree, Search, X } from 'lucide-react';
+import { format } from 'date-fns';
 
 type ViewMode = 'grid' | 'tree';
 
@@ -15,12 +17,31 @@ export default function Photos() {
   const { data: photos = [], isLoading } = usePhotoRecords();
   const { profile } = useAuth();
   const [viewMode, setViewMode] = useState<ViewMode>('tree');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Filter photos based on search term
+  const filteredPhotos = useMemo(() => {
+    if (!searchTerm.trim()) return photos;
+    
+    const term = searchTerm.toLowerCase();
+    return photos.filter(photo => {
+      const companyMatch = photo.company_name?.toLowerCase().includes(term);
+      const projectMatch = photo.project_name?.toLowerCase().includes(term);
+      const activityMatch = photo.activity_text?.toLowerCase().includes(term);
+      const frenteMatch = photo.frente_servico?.toLowerCase().includes(term);
+      const templateMatch = photo.templates?.name?.toLowerCase().includes(term);
+      const dateMatch = format(new Date(photo.device_timestamp), 'dd/MM/yyyy').includes(term);
+      const monthMatch = format(new Date(photo.device_timestamp), 'MMMM').toLowerCase().includes(term);
+      
+      return companyMatch || projectMatch || activityMatch || frenteMatch || templateMatch || dateMatch || monthMatch;
+    });
+  }, [photos, searchTerm]);
 
   // Build the folder tree structure
   const photoTree = useMemo(() => {
-    if (!photos.length || !profile?.full_name) return [];
-    return buildUserPhotoTree(photos, profile.full_name);
-  }, [photos, profile?.full_name]);
+    if (!filteredPhotos.length || !profile?.full_name) return [];
+    return buildUserPhotoTree(filteredPhotos, profile.full_name);
+  }, [filteredPhotos, profile?.full_name]);
 
   return (
     <div className="min-h-screen pb-24">
@@ -68,6 +89,36 @@ export default function Photos() {
         </div>
       </header>
 
+      {/* Search Bar */}
+      {photos.length > 0 && (
+        <div className="px-4 pt-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por empresa, atividade, data..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 pr-9 h-10 bg-muted/50 border-muted"
+            />
+            {searchTerm && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                onClick={() => setSearchTerm('')}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+          {searchTerm && (
+            <p className="text-xs text-muted-foreground mt-2">
+              {filteredPhotos.length} foto(s) encontrada(s)
+            </p>
+          )}
+        </div>
+      )}
+
       <main className="px-4 py-6">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-16 animate-fade-in">
@@ -93,13 +144,24 @@ export default function Photos() {
               Capturar Foto
             </Button>
           </div>
+        ) : filteredPhotos.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-in">
+            <Search className="h-10 w-10 text-muted-foreground mb-4" />
+            <h3 className="font-display font-semibold text-lg mb-2">Nenhum resultado</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Nenhuma foto encontrada para "{searchTerm}"
+            </p>
+            <Button variant="outline" onClick={() => setSearchTerm('')}>
+              Limpar busca
+            </Button>
+          </div>
         ) : viewMode === 'tree' ? (
           <div className="animate-fade-in">
             <FolderTreeView nodes={photoTree} />
           </div>
         ) : (
           <div className="grid grid-cols-3 gap-2 animate-fade-in">
-            {photos.map((photo, index) => (
+            {filteredPhotos.map((photo, index) => (
               <div 
                 key={photo.id} 
                 className="animate-scale-in"
