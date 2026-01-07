@@ -41,17 +41,47 @@ serve(async (req) => {
 
     console.log("[ZIP] User authenticated:", user.id);
 
-    // Get user profile name
+    // Parse request body for optional targetUserId (admin only)
+    let targetUserId = user.id;
+    let body: { userId?: string } = {};
+    
+    try {
+      body = await req.json();
+    } catch {
+      // No body or invalid JSON, use current user
+    }
+
+    // Check if admin is requesting another user's photos
+    if (body.userId && body.userId !== user.id) {
+      // Verify caller is admin
+      const { data: roleData } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .single();
+
+      if (roleData?.role !== "admin") {
+        return new Response(JSON.stringify({ error: "Acesso negado" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      targetUserId = body.userId;
+      console.log("[ZIP] Admin downloading photos for user:", targetUserId);
+    }
+
+    // Get target user profile name
     const { data: profile } = await supabase
       .from("profiles")
       .select("full_name")
-      .eq("id", user.id)
+      .eq("id", targetUserId)
       .single();
 
     const userName = profile?.full_name || "Usuario";
     const sanitize = (str: string) => str.replace(/[^a-zA-Z0-9_\-\s]/g, "_").substring(0, 50);
 
-    // Fetch user's photos
+    // Fetch target user's photos
     const { data: photos, error: photosError } = await supabase
       .from("photo_records")
       .select(`
@@ -65,7 +95,7 @@ serve(async (req) => {
         device_timestamp,
         templates(name)
       `)
-      .eq("user_id", user.id)
+      .eq("user_id", targetUserId)
       .order("device_timestamp", { ascending: false });
 
     if (photosError) {
@@ -80,7 +110,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`[ZIP] Found ${photos.length} photos to download`);
+    console.log(`[ZIP] Found ${photos.length} photos to download for user ${userName}`);
 
     // Create ZIP
     const zip = new JSZip();

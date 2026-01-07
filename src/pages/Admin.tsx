@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { ChevronLeft, Building2, FolderOpen, FileText, Plus, Loader2, Users, Trash2, Pencil } from 'lucide-react';
+import { ChevronLeft, Building2, FolderOpen, FileText, Plus, Loader2, Users, Trash2, Pencil, Download } from 'lucide-react';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -60,6 +60,7 @@ export default function Admin() {
   const [editUserName, setEditUserName] = useState('');
   const [deletingUser, setDeletingUser] = useState<UserWithRole | null>(null);
   const [isDeletingUser, setIsDeletingUser] = useState(false);
+  const [downloadingUserId, setDownloadingUserId] = useState<string | null>(null);
 
   // Fetch users with roles
   const { data: users = [], isLoading: isLoadingUsers } = useQuery({
@@ -338,6 +339,58 @@ export default function Admin() {
     }
   };
 
+  const handleDownloadUserPhotos = async (userId: string, userName: string) => {
+    try {
+      setDownloadingUserId(userId);
+      toast({ title: 'Preparando download...', description: `Gerando ZIP para ${userName}` });
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({ title: 'Erro', description: 'Você precisa estar logado', variant: 'destructive' });
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/download-photos-zip`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ userId }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erro ao gerar ZIP');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const sanitizedName = userName.replace(/[^a-zA-Z0-9_\-\s]/g, '_').substring(0, 50);
+      a.download = `fotos_${sanitizedName}_${new Date().toISOString().split('T')[0]}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({ title: 'Download concluído!', description: `Fotos de ${userName}` });
+    } catch (error) {
+      console.error('Download error:', error);
+      toast({
+        title: 'Erro ao baixar fotos',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: 'destructive',
+      });
+    } finally {
+      setDownloadingUserId(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background pb-24">
       {/* Header */}
@@ -439,6 +492,20 @@ export default function Admin() {
                         </p>
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => handleDownloadUserPhotos(u.id, u.full_name)}
+                          disabled={downloadingUserId === u.id}
+                          title="Baixar fotos deste usuário"
+                        >
+                          {downloadingUserId === u.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Download className="h-4 w-4" />
+                          )}
+                        </Button>
                         <Button 
                           variant="outline" 
                           size="sm"
