@@ -51,6 +51,35 @@ export function PhotoStamp({
   );
 }
 
+// Helper function to draw rounded rectangle (polyfill for older browsers)
+function drawRoundedRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number
+) {
+  // Use native roundRect if available, otherwise fallback
+  if (typeof ctx.roundRect === 'function') {
+    ctx.beginPath();
+    ctx.roundRect(x, y, width, height, radius);
+  } else {
+    // Fallback for older browsers
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+  }
+}
+
 // Utility function to draw stamp on canvas for actual photo file
 export async function drawStampOnImage(
   imageBlob: Blob,
@@ -97,12 +126,12 @@ export async function drawStampOnImage(
         const lines: string[] = [];
         
         // Add company and project first (more prominent)
-        if (stampData.companyName) lines.push(`🏢 ${stampData.companyName}`);
-        if (stampData.projectName) lines.push(`📁 ${stampData.projectName}`);
-        if (stampData.frenteServico) lines.push(`🔧 ${stampData.frenteServico}`);
-        if (stampData.userName) lines.push(`👤 ${stampData.userName}`);
-        lines.push(`📅 ${formattedDate}`);
-        lines.push(`📍 ${coordsText}`);
+        if (stampData.companyName) lines.push(`${stampData.companyName}`);
+        if (stampData.projectName) lines.push(`${stampData.projectName}`);
+        if (stampData.frenteServico) lines.push(`${stampData.frenteServico}`);
+        if (stampData.userName) lines.push(`${stampData.userName}`);
+        lines.push(`${formattedDate}`);
+        lines.push(`${coordsText}`);
         
         // Calculate font size based on image size (responsive)
         const fontSize = Math.max(Math.floor(img.width / 30), 16);
@@ -120,10 +149,9 @@ export async function drawStampOnImage(
         const boxX = padding / 2;
         const boxY = img.height - boxHeight - padding / 2;
         
-        // Draw semi-transparent background
+        // Draw semi-transparent background using polyfill
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.beginPath();
-        ctx.roundRect(boxX, boxY, boxWidth, boxHeight, fontSize * 0.3);
+        drawRoundedRect(ctx, boxX, boxY, boxWidth, boxHeight, fontSize * 0.3);
         ctx.fill();
         
         // Draw text - bright yellow/orange color for visibility
