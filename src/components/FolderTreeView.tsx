@@ -9,14 +9,21 @@ import {
   Building2, 
   Briefcase, 
   Calendar,
-  Clock
+  Clock,
+  Trash2,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { ConfidenceBadge } from './ConfidenceBadge';
 import { PhotoRecord } from '@/hooks/usePhotos';
 import { format } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import { ptBR } from 'date-fns/locale';
 
 export interface FolderNode {
@@ -31,6 +38,7 @@ export interface FolderNode {
 interface FolderTreeViewProps {
   nodes: FolderNode[];
   onPhotoClick?: (photo: PhotoRecord) => void;
+  onPhotoDeleted?: () => void;
 }
 
 const getIcon = (type: FolderNode['type'], isExpanded: boolean) => {
@@ -61,13 +69,17 @@ const getIcon = (type: FolderNode['type'], isExpanded: boolean) => {
 function TreeNode({ 
   node, 
   level = 0, 
-  onPhotoClick 
+  onPhotoClick,
+  onPhotoDeleted
 }: { 
   node: FolderNode; 
   level?: number;
   onPhotoClick?: (photo: PhotoRecord) => void;
+  onPhotoDeleted?: () => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(level < 1);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const hasChildren = node.children && node.children.length > 0;
   
   const handleClick = () => {
@@ -77,12 +89,46 @@ function TreeNode({
       setIsExpanded(!isExpanded);
     }
   };
+
+  const handleDeletePhoto = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!node.data) return;
+    
+    setIsDeleting(true);
+    try {
+      // Delete from storage
+      if (node.data.file_path) {
+        await supabase.storage.from('photos').remove([node.data.file_path]);
+      }
+      
+      // Delete from database
+      const { error } = await supabase
+        .from('photo_records')
+        .delete()
+        .eq('id', node.data.id);
+      
+      if (error) throw error;
+      
+      toast.success('Foto excluída com sucesso');
+      setShowDeleteConfirm(false);
+      onPhotoDeleted?.();
+    } catch (error) {
+      console.error('Error deleting photo:', error);
+      toast.error('Erro ao excluir foto');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
   
   return (
     <div className="select-none">
       <div
         className={cn(
-          "flex items-center gap-1.5 py-1 px-1.5 rounded cursor-pointer transition-colors",
+          "flex items-center gap-1.5 py-1 px-1.5 rounded cursor-pointer transition-colors group",
           "hover:bg-muted/50",
           node.type === 'photo' && "hover:bg-primary/10"
         )}
@@ -129,7 +175,42 @@ function TreeNode({
         {node.type === 'photo' && node.data?.ocr_confidence !== null && (
           <ConfidenceBadge score={node.data.ocr_confidence || 0} size="sm" />
         )}
+
+        {/* Delete button for photos */}
+        {node.type === 'photo' && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-5 w-5 opacity-0 group-hover:opacity-100 hover:bg-destructive/20 hover:text-destructive"
+            onClick={handleDeletePhoto}
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir foto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. A foto será permanentemente excluída.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       
       {/* Children */}
       {isExpanded && hasChildren && (
@@ -140,6 +221,7 @@ function TreeNode({
               node={child}
               level={level + 1}
               onPhotoClick={onPhotoClick}
+              onPhotoDeleted={onPhotoDeleted}
             />
           ))}
         </div>
@@ -283,12 +365,49 @@ export function buildUserPhotoTree(photos: PhotoRecord[], userName: string): Fol
   return [userNode];
 }
 
-export function FolderTreeView({ nodes, onPhotoClick }: FolderTreeViewProps) {
+export function FolderTreeView({ nodes, onPhotoClick, onPhotoDeleted }: FolderTreeViewProps) {
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoRecord | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const queryClient = useQueryClient();
   
   const handlePhotoClick = (photo: PhotoRecord) => {
     setSelectedPhoto(photo);
     onPhotoClick?.(photo);
+  };
+
+  const handleDeleteSelectedPhoto = async () => {
+    if (!selectedPhoto) return;
+    
+    setIsDeleting(true);
+    try {
+      if (selectedPhoto.file_path) {
+        await supabase.storage.from('photos').remove([selectedPhoto.file_path]);
+      }
+      
+      const { error } = await supabase
+        .from('photo_records')
+        .delete()
+        .eq('id', selectedPhoto.id);
+      
+      if (error) throw error;
+      
+      toast.success('Foto excluída com sucesso');
+      setShowDeleteConfirm(false);
+      setSelectedPhoto(null);
+      queryClient.invalidateQueries({ queryKey: ['photo_records'] });
+      onPhotoDeleted?.();
+    } catch (error) {
+      console.error('Error deleting photo:', error);
+      toast.error('Erro ao excluir foto');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleTreePhotoDeleted = () => {
+    queryClient.invalidateQueries({ queryKey: ['photo_records'] });
+    onPhotoDeleted?.();
   };
   
   return (
@@ -305,6 +424,7 @@ export function FolderTreeView({ nodes, onPhotoClick }: FolderTreeViewProps) {
               key={node.id}
               node={node}
               onPhotoClick={handlePhotoClick}
+              onPhotoDeleted={handleTreePhotoDeleted}
             />
           ))
         )}
@@ -365,10 +485,43 @@ export function FolderTreeView({ nodes, onPhotoClick }: FolderTreeViewProps) {
                   </div>
                 )}
               </div>
+              <DialogFooter>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setShowDeleteConfirm(true)}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Excluir Foto
+                </Button>
+              </DialogFooter>
             </div>
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir foto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. A foto será permanentemente excluída.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteSelectedPhoto}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

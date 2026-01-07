@@ -11,8 +11,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { ChevronLeft, Building2, FolderOpen, FileText, Plus, Loader2, Users, Trash2 } from 'lucide-react';
+import { ChevronLeft, Building2, FolderOpen, FileText, Plus, Loader2, Users, Trash2, Pencil } from 'lucide-react';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 
 interface UserWithRole {
   id: string;
@@ -52,6 +54,12 @@ export default function Admin() {
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserName, setNewUserName] = useState('');
+
+  // Edit/Delete state
+  const [editingUser, setEditingUser] = useState<UserWithRole | null>(null);
+  const [editUserName, setEditUserName] = useState('');
+  const [deletingUser, setDeletingUser] = useState<UserWithRole | null>(null);
+  const [isDeletingUser, setIsDeletingUser] = useState(false);
 
   // Fetch users with roles
   const { data: users = [], isLoading: isLoadingUsers } = useQuery({
@@ -263,6 +271,73 @@ export default function Admin() {
     }
   };
 
+  const handleEditUser = async () => {
+    if (!editingUser) return;
+    setIsLoading(true);
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ full_name: editUserName })
+        .eq('id', editingUser.id);
+
+      if (error) throw error;
+
+      toast({ title: 'Nome atualizado com sucesso!' });
+      setEditingUser(null);
+      setEditUserName('');
+      queryClient.invalidateQueries({ queryKey: ['admin_users'] });
+    } catch (error) {
+      toast({
+        title: 'Erro ao atualizar usuário',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!deletingUser) return;
+    
+    // Prevent self-deletion
+    if (deletingUser.id === user?.id) {
+      toast({
+        title: 'Não permitido',
+        description: 'Você não pode excluir seu próprio usuário',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsDeletingUser(true);
+    try {
+      // Delete user role first
+      await supabase.from('user_roles').delete().eq('user_id', deletingUser.id);
+      
+      // Delete profile
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', deletingUser.id);
+
+      if (error) throw error;
+
+      toast({ title: 'Usuário excluído com sucesso!' });
+      setDeletingUser(null);
+      queryClient.invalidateQueries({ queryKey: ['admin_users'] });
+    } catch (error) {
+      toast({
+        title: 'Erro ao excluir usuário',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeletingUser(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background pb-24">
       {/* Header */}
@@ -356,20 +431,42 @@ export default function Admin() {
                   </div>
                 ) : (
                   users.map(u => (
-                    <div key={u.id} className="p-3 rounded-lg bg-muted/50 flex justify-between items-center">
-                      <div>
-                        <p className="font-medium">{u.full_name}</p>
+                    <div key={u.id} className="p-3 rounded-lg bg-muted/50 flex justify-between items-center gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{u.full_name}</p>
                         <p className="text-xs text-muted-foreground">
                           {u.role === 'admin' ? '👑 Administrador' : '👷 Colaborador'}
                         </p>
                       </div>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleToggleRole(u.id, u.role)}
-                      >
-                        {u.role === 'admin' ? 'Tornar Colaborador' : 'Tornar Admin'}
-                      </Button>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleToggleRole(u.id, u.role)}
+                        >
+                          {u.role === 'admin' ? 'Colaborador' : 'Admin'}
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => {
+                            setEditingUser(u);
+                            setEditUserName(u.full_name);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => setDeletingUser(u)}
+                          disabled={u.id === user?.id}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))
                 )}
@@ -550,6 +647,57 @@ export default function Admin() {
       </main>
 
       <BottomNav />
+
+      {/* Edit User Dialog */}
+      <Dialog open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Usuário</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Nome Completo</Label>
+              <Input
+                value={editUserName}
+                onChange={(e) => setEditUserName(e.target.value)}
+                placeholder="Nome do colaborador"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingUser(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleEditUser} disabled={isLoading || !editUserName.trim()}>
+              {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete User Confirmation */}
+      <AlertDialog open={!!deletingUser} onOpenChange={(open) => !open && setDeletingUser(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir usuário?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir "{deletingUser?.full_name}"? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingUser}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteUser}
+              disabled={isDeletingUser}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeletingUser && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
