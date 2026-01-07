@@ -126,13 +126,26 @@ export default function PhotoMap() {
                           </span>
                         </div>
 
+                        {photo.company_name && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Building2 className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-foreground font-medium">{photo.company_name}</span>
+                          </div>
+                        )}
+
+                        {photo.project_name && (
+                          <p className="text-sm text-muted-foreground pl-6">
+                            {photo.project_name}
+                          </p>
+                        )}
+
                         {photo.activity_text && (
                           <p className="text-sm text-foreground line-clamp-2">
                             {photo.activity_text}
                           </p>
                         )}
 
-                        {photo.ocr_confidence && (
+                        {photo.ocr_confidence != null && photo.ocr_confidence > 0 && (
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-muted-foreground">OCR:</span>
                             <Badge variant="outline" className="text-xs">
