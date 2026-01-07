@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { UpdatePrompt } from "@/components/UpdatePrompt";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Capture from "./pages/Capture";
@@ -97,6 +98,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AppRoutes />
+        <UpdatePrompt />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
