@@ -26,12 +26,36 @@ export default function Admin() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isAdmin, isLoading: authLoading, user } = useAuth();
 
   const { data: companies = [] } = useCompanies();
   const { data: projects = [] } = useProjects();
   const { data: templates = [] } = useTemplates();
 
   const [isLoading, setIsLoading] = useState(false);
+
+  // Redirect if not admin
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    navigate('/auth');
+    return null;
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 p-4">
+        <p className="text-muted-foreground text-center">Acesso restrito a administradores</p>
+        <Button onClick={() => navigate('/dashboard')}>Voltar ao Dashboard</Button>
+      </div>
+    );
+  }
 
   // Company form
   const [companyName, setCompanyName] = useState('');
@@ -177,6 +201,8 @@ export default function Admin() {
     setIsLoading(true);
 
     try {
+      console.log('Creating user with:', { email: newUserEmail, full_name: newUserName });
+      
       const { data, error } = await supabase.functions.invoke('admin-create-user', {
         body: {
           email: newUserEmail,
@@ -185,8 +211,17 @@ export default function Admin() {
         },
       });
 
-      if (error) throw error;
-      if (!data?.ok) throw new Error(data?.error || 'Não foi possível criar o colaborador');
+      console.log('Response:', { data, error });
+
+      if (error) {
+        console.error('Function error:', error);
+        throw new Error(error.message || 'Erro na chamada da função');
+      }
+      
+      if (!data?.ok) {
+        console.error('Data error:', data);
+        throw new Error(data?.error || 'Não foi possível criar o colaborador');
+      }
 
       toast({
         title: 'Colaborador criado com sucesso!',
@@ -197,6 +232,7 @@ export default function Admin() {
       setNewUserName('');
       queryClient.invalidateQueries({ queryKey: ['admin_users'] });
     } catch (error) {
+      console.error('Caught error:', error);
       toast({
         title: 'Erro ao criar colaborador',
         description: error instanceof Error ? error.message : 'Erro desconhecido',
