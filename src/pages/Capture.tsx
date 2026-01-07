@@ -483,24 +483,17 @@ export default function Capture() {
               <FolderKanban className="h-3.5 w-3.5" />
               Projeto/Obra
             </Label>
-            <Select
-              value={projectId || ""}
-              onValueChange={(v) => {
-                setProjectId(v);
-                const p = filteredProjects.find(x => x.id === v);
-                setProjectName(p?.name || '');
+            <Input
+              placeholder="Digite o nome do projeto..."
+              value={projectName}
+              onChange={(e) => {
+                setProjectName(e.target.value);
+                // Try to match with existing project
+                const matched = filteredProjects.find(p => p.name.toLowerCase() === e.target.value.toLowerCase());
+                setProjectId(matched?.id || '');
               }}
-              disabled={!companyId}
-            >
-              <SelectTrigger className="bg-secondary/50 border-border/50 rounded-xl">
-                <SelectValue placeholder={companyId ? "Selecione o projeto" : "Selecione a empresa primeiro"} />
-              </SelectTrigger>
-              <SelectContent className="glass-card border-border/50">
-                {filteredProjects.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              className="bg-secondary/50 border-border/50 rounded-xl focus:border-primary/50"
+            />
           </div>
 
           {/* Frente de Serviço */}
