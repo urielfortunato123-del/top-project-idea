@@ -5,11 +5,12 @@ import { usePendingPhotos, usePhotoRecords, useSyncPendingPhotos } from '@/hooks
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useGeolocation } from '@/hooks/useGeolocation';
+import { useLanguage } from '@/i18n/LanguageContext';
 import { BottomNav } from '@/components/BottomNav';
 import { SyncIndicator } from '@/components/SyncIndicator';
 import { NotificationToggle } from '@/components/NotificationToggle';
 import { Button } from '@/components/ui/button';
-import { Camera, Images, Clock, CheckCircle, AlertCircle, CloudUpload, RefreshCw, BarChart3, Wifi, WifiOff } from 'lucide-react';
+import { Camera, Images, Clock, CheckCircle, AlertCircle, CloudUpload, RefreshCw, BarChart3, WifiOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Dashboard() {
@@ -19,6 +20,7 @@ export default function Dashboard() {
   const { toast } = useToast();
   const { notifySyncComplete } = useNotifications();
   const { getPosition } = useGeolocation();
+  const { t } = useLanguage();
   
   const { data: pendingPhotos = [] } = usePendingPhotos();
   const { data: photoRecords = [] } = usePhotoRecords();
@@ -48,21 +50,21 @@ export default function Dashboard() {
 
       if (successCount > 0) {
         toast({
-          title: 'Sincronização concluída',
-          description: `${successCount} foto(s) enviada(s) com sucesso.`,
+          title: t.dashboard.syncComplete,
+          description: t.dashboard.syncCompleteDesc.replace('{count}', String(successCount)),
         });
       }
       if (failCount > 0) {
         toast({
-          title: 'Algumas fotos falharam',
-          description: `${failCount} foto(s) não puderam ser enviadas.`,
+          title: t.dashboard.somePhotosFailed,
+          description: t.dashboard.somePhotosFailedDesc.replace('{count}', String(failCount)),
           variant: 'destructive',
         });
       }
     } catch (error) {
       toast({
-        title: 'Erro na sincronização',
-        description: 'Não foi possível sincronizar as fotos.',
+        title: t.dashboard.syncError,
+        description: t.dashboard.syncErrorDesc,
         variant: 'destructive',
       });
     }
@@ -70,21 +72,21 @@ export default function Dashboard() {
 
   const stats = [
     {
-      label: 'Pendentes',
+      label: t.dashboard.pendingLabel,
       value: pendingCount,
       icon: Clock,
       gradient: 'from-amber-500 to-orange-500',
       bgGlow: 'shadow-[0_0_20px_hsl(38,92%,50%,0.3)]',
     },
     {
-      label: 'Enviadas',
+      label: t.dashboard.sentLabel,
       value: uploadedCount,
       icon: CheckCircle,
       gradient: 'from-emerald-500 to-teal-500',
       bgGlow: 'shadow-[0_0_20px_hsl(160,84%,39%,0.3)]',
     },
     {
-      label: 'Erros',
+      label: t.dashboard.errorsLabel,
       value: errorCount,
       icon: AlertCircle,
       gradient: 'from-red-500 to-rose-500',
@@ -99,12 +101,12 @@ export default function Dashboard() {
         <div className="px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="animate-fade-in">
-              <p className="text-sm text-muted-foreground">Olá,</p>
+              <p className="text-sm text-muted-foreground">{t.hello},</p>
               <h1 className="text-xl font-display font-bold text-gradient">{profile?.full_name || user?.email}</h1>
               {isAdmin && (
                 <span className="inline-flex items-center gap-1 text-xs text-accent font-medium mt-0.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-                  Administrador
+                  {t.administrator}
                 </span>
               )}
             </div>
@@ -125,7 +127,7 @@ export default function Dashboard() {
         {/* Quick Actions */}
         <section className="space-y-3 animate-slide-up" style={{ animationDelay: '100ms' }}>
           <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Ações Rápidas
+            {t.dashboard.quickActions}
           </h2>
           <div className="grid grid-cols-2 gap-3">
             <Button
@@ -136,7 +138,7 @@ export default function Dashboard() {
               <div className="p-3 rounded-xl bg-white/20">
                 <Camera className="h-7 w-7" />
               </div>
-              <span className="font-display font-semibold">Nova Foto</span>
+              <span className="font-display font-semibold">{t.dashboard.newPhoto}</span>
             </Button>
             <Button
               size="lg"
@@ -147,7 +149,7 @@ export default function Dashboard() {
               <div className="p-3 rounded-xl bg-warning/20">
                 <CloudUpload className="h-7 w-7 text-warning" />
               </div>
-              <span className="font-display font-semibold">Pendentes ({pendingCount})</span>
+              <span className="font-display font-semibold">{t.dashboard.pending} ({pendingCount})</span>
             </Button>
           </div>
 
@@ -160,7 +162,7 @@ export default function Dashboard() {
               disabled={!isOnline || pendingCount === 0 || syncMutation.isPending}
             >
               <RefreshCw className={`h-5 w-5 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
-              <span className="text-sm font-medium">Sincronizar</span>
+              <span className="text-sm font-medium">{t.dashboard.sync}</span>
             </Button>
             <Button
               size="lg"
@@ -169,7 +171,7 @@ export default function Dashboard() {
               onClick={() => navigate('/photos')}
             >
               <Images className="h-5 w-5" />
-              <span className="text-sm font-medium">Minhas Fotos</span>
+              <span className="text-sm font-medium">{t.dashboard.myPhotos}</span>
             </Button>
           </div>
 
@@ -183,7 +185,7 @@ export default function Dashboard() {
               <div className="p-2 rounded-xl bg-accent/20">
                 <BarChart3 className="h-5 w-5 text-accent" />
               </div>
-              <span className="font-display font-semibold">Painel Administrativo</span>
+              <span className="font-display font-semibold">{t.dashboard.adminPanel}</span>
             </Button>
           )}
         </section>
@@ -191,7 +193,7 @@ export default function Dashboard() {
         {/* Stats */}
         <section className="space-y-3 animate-slide-up" style={{ animationDelay: '200ms' }}>
           <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Resumo
+            {t.dashboard.summary}
           </h2>
           <div className="grid grid-cols-3 gap-3">
             {stats.map((stat, index) => {
@@ -220,9 +222,9 @@ export default function Dashboard() {
               <WifiOff className="h-5 w-5 text-warning" />
             </div>
             <div>
-              <p className="font-display font-semibold text-sm">Modo Offline</p>
+              <p className="font-display font-semibold text-sm">{t.dashboard.offlineMode}</p>
               <p className="text-xs text-muted-foreground">
-                Suas fotos serão sincronizadas quando houver conexão.
+                {t.dashboard.offlineModeDesc}
               </p>
             </div>
           </div>

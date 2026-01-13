@@ -5,9 +5,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { UpdatePrompt } from "@/components/UpdatePrompt";
+import { LanguageProvider } from "@/i18n/LanguageContext";
 import { Suspense, lazy, memo } from "react";
 import { Loader2 } from "lucide-react";
-
 // Lazy load all pages for better initial load performance
 const Auth = lazy(() => import("./pages/Auth"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -108,14 +108,16 @@ function AppRoutes() {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider delayDuration={300}>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AppRoutes />
-        <UpdatePrompt />
-      </BrowserRouter>
-    </TooltipProvider>
+    <LanguageProvider>
+      <TooltipProvider delayDuration={300}>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AppRoutes />
+          <UpdatePrompt />
+        </BrowserRouter>
+      </TooltipProvider>
+    </LanguageProvider>
   </QueryClientProvider>
 );
 
