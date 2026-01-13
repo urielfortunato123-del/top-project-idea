@@ -1,10 +1,11 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { usePhotoRecords, usePendingPhotos } from '@/hooks/usePhotos';
+import { useLanguage } from '@/i18n/LanguageContext';
 import { BottomNav } from '@/components/BottomNav';
+import { LanguageSelector } from '@/components/LanguageSelector';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { 
   User, 
@@ -12,12 +13,14 @@ import {
   Camera, 
   HardHat,
   Shield,
-  RefreshCw
+  RefreshCw,
+  Settings
 } from 'lucide-react';
 
 export default function Profile() {
   const { user, profile, role, signOut } = useAuth();
   const navigate = useNavigate();
+  const { t } = useLanguage();
   
   const { data: photos = [] } = usePhotoRecords();
   const { data: pending = [] } = usePendingPhotos();
@@ -44,7 +47,7 @@ export default function Profile() {
           <p className="text-sm text-muted-foreground">{user?.email}</p>
           <span className="mt-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium capitalize flex items-center gap-1">
             {role === 'admin' && <Shield className="h-3 w-3" />}
-            {role === 'admin' ? 'Administrador' : 'Colaborador'}
+            {role === 'admin' ? t.administrator : 'Colaborador'}
           </span>
         </div>
       </header>
@@ -55,18 +58,31 @@ export default function Profile() {
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <Camera className="h-4 w-4" />
-              Estatísticas
+              {t.dashboard.summary}
             </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-4 text-center">
             <div>
               <p className="text-2xl font-bold">{photos.length}</p>
-              <p className="text-xs text-muted-foreground">Fotos Enviadas</p>
+              <p className="text-xs text-muted-foreground">{t.dashboard.sentLabel}</p>
             </div>
             <div>
               <p className="text-2xl font-bold text-warning">{pending.length}</p>
-              <p className="text-xs text-muted-foreground">Pendentes</p>
+              <p className="text-xs text-muted-foreground">{t.dashboard.pendingLabel}</p>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Settings Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              {t.profile.settings}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <LanguageSelector />
           </CardContent>
         </Card>
 
@@ -75,12 +91,12 @@ export default function Profile() {
           variant="outline"
           className="w-full"
           onClick={() => {
-            toast.info('Verificando atualizações...');
+            toast.info(t.loading);
             if ('serviceWorker' in navigator) {
               navigator.serviceWorker.getRegistration().then((registration) => {
                 if (registration) {
                   registration.update().then(() => {
-                    toast.success('Aplicativo atualizado!');
+                    toast.success(t.success);
                     setTimeout(() => window.location.reload(), 500);
                   }).catch(() => {
                     window.location.reload();
@@ -95,7 +111,7 @@ export default function Profile() {
           }}
         >
           <RefreshCw className="mr-2 h-4 w-4" />
-          Atualizar Aplicativo
+          {t.dashboard.sync}
         </Button>
 
         {/* Logout */}
@@ -105,7 +121,7 @@ export default function Profile() {
           onClick={handleLogout}
         >
           <LogOut className="mr-2 h-4 w-4" />
-          Sair da Conta
+          {t.profile.logout}
         </Button>
 
         {/* App Info */}

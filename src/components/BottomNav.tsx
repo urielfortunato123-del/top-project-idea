@@ -2,21 +2,23 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { Home, Camera, Images, User, Settings, MapPin, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { useLanguage } from '@/i18n/LanguageContext';
 import { memo, useMemo } from 'react';
 
 export const BottomNav = memo(function BottomNav() {
   const location = useLocation();
   const { isAdmin } = useAuth();
+  const { t } = useLanguage();
 
   const navItems = useMemo(() => [
-    { to: '/dashboard', icon: Home, label: 'Início' },
-    { to: '/capture', icon: Camera, label: 'Capturar' },
-    { to: '/photos', icon: Images, label: 'Fotos' },
-    { to: '/pending', icon: Clock, label: 'Pendentes' },
-    ...(isAdmin ? [{ to: '/photo-map', icon: MapPin, label: 'Mapa' }] : []),
-    ...(isAdmin ? [{ to: '/admin', icon: Settings, label: 'Admin' }] : []),
-    { to: '/profile', icon: User, label: 'Perfil' },
-  ], [isAdmin]);
+    { to: '/dashboard', icon: Home, label: t.nav.home },
+    { to: '/capture', icon: Camera, label: t.nav.capture },
+    { to: '/photos', icon: Images, label: t.nav.photos },
+    { to: '/pending', icon: Clock, label: t.nav.pending },
+    ...(isAdmin ? [{ to: '/photo-map', icon: MapPin, label: t.nav.map }] : []),
+    ...(isAdmin ? [{ to: '/admin', icon: Settings, label: t.nav.admin }] : []),
+    { to: '/profile', icon: User, label: t.nav.profile },
+  ], [isAdmin, t]);
 
   return (
     <nav className="glass-nav pwa-safe-area">
