@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useBiometricAuth } from '@/hooks/useBiometricAuth';
+import { useLanguage } from '@/i18n/LanguageContext';
+import { LanguageSelector } from '@/components/LanguageSelector';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,7 +11,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Camera, Loader2, HardHat, Fingerprint, ScanFace, Smartphone } from 'lucide-react';
+import { Camera, Loader2, HardHat, Fingerprint, ScanFace, Smartphone, Globe } from 'lucide-react';
 import { z } from 'zod';
 import { cn } from '@/lib/utils';
 
@@ -28,6 +30,7 @@ const signupSchema = loginSchema.extend({
 
 export default function Auth() {
   const { user, isLoading, signIn, signUp } = useAuth();
+  const { t } = useLanguage();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [enableBiometric, setEnableBiometric] = useState(false);
@@ -200,6 +203,18 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-background">
+      {/* Language selector - top right */}
+      <div className="absolute top-4 right-4 flex items-center gap-2">
+        <Link 
+          to="/landing" 
+          className="text-sm text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
+        >
+          <Globe className="h-4 w-4" />
+          <span className="hidden sm:inline">International</span>
+        </Link>
+        <LanguageSelector showLabel={false} />
+      </div>
+
       {/* Logo */}
       <div className="flex flex-col items-center mb-8 animate-fade-in">
         <div className="relative mb-4">
@@ -219,8 +234,8 @@ export default function Auth() {
         <Tabs defaultValue="login">
           <CardHeader>
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="login">Entrar</TabsTrigger>
-              <TabsTrigger value="signup">Cadastrar</TabsTrigger>
+              <TabsTrigger value="login">{t.auth.login}</TabsTrigger>
+              <TabsTrigger value="signup">{t.auth.signup}</TabsTrigger>
             </TabsList>
           </CardHeader>
 
