@@ -10,6 +10,7 @@ import { Suspense, lazy, memo } from "react";
 import { Loader2 } from "lucide-react";
 // Lazy load all pages for better initial load performance
 const Auth = lazy(() => import("./pages/Auth"));
+const LandingPage = lazy(() => import("./pages/LandingPage"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Capture = lazy(() => import("./pages/Capture"));
 const Pending = lazy(() => import("./pages/Pending"));
@@ -88,6 +89,7 @@ function AppRoutes() {
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/" element={<Auth />} />
+        <Route path="/landing" element={<LandingPage />} />
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/capture" element={<ProtectedRoute><Capture /></ProtectedRoute>} />
         <Route path="/pending" element={<ProtectedRoute><Pending /></ProtectedRoute>} />
